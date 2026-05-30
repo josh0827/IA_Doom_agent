@@ -18,7 +18,7 @@ from src.perception.features import STATE_DIM, extract_state
 from src.policy.actions import Action, action_to_vizdoom
 
 KILL_REWARD    = 100.0
-AIM_REWARD     = 3.0   # bonus por cada paso con enemigo centrado (fomenta apuntar)
+PROGRESS_SCALE = 0.1   # pequeno incentivo para avanzar (sin dominar sobre matar)
 HEALTH_PENALTY = 0.5
 
 
@@ -28,7 +28,7 @@ class RLEnv:
         weights: Path,
         scenario: Path,
         frame_skip: int = 4,
-        conf: float = 0.08,
+        conf: float = 0.12,
         window_visible: bool = False,
     ):
         self.env = DoomEnv(scenario, window_visible=window_visible)
@@ -62,7 +62,7 @@ class RLEnv:
         frame, reward_env, done, info = self.env.step(
             action_to_vizdoom(action), tics=self.frame_skip
         )
-        reward = 0.0   # PROGRESS_SCALE = 0: no reward por avanzar
+        reward = PROGRESS_SCALE * float(reward_env)
 
         if done or frame is None:
             self._last_overlay_data = None
@@ -99,8 +99,7 @@ class RLEnv:
                         enemy_centered = True
                     break
 
-        if enemy_centered:
-            reward += AIM_REWARD
+        # AIM_REWARD eliminado: causaba disparar a falsos positivos con conf baja
 
         # Actualizar contadores
         if enemy_present:
