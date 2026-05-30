@@ -30,7 +30,7 @@ class DoomEnv:
         state = self.game.get_state()
         if state is None:
             return None
-        return state.screen_buffer.transpose(1, 2, 0)
+        return state.screen_buffer  # ViZDoom 1.3+ devuelve (H, W, 3) directamente
 
     def close(self):
         self.game.close()
