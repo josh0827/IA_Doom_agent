@@ -55,6 +55,9 @@ pip install -r requirements.txt
 
 Después descargar el dataset desde Roboflow (link pendiente) y colocar en `dataset/doom-yolo/`.
 
+**Demo en FreeDoom (niveles reales, gratis):**
+Descargar `freedoom1.wad` desde https://freedoom.github.io/ y colocarlo en `src/env/scenarios/`.
+
 ## Estructura
 
 ```
@@ -80,9 +83,14 @@ python scripts/train_rl.py --episodes 400
 ```
 Genera `runs/rl/dqn.pt` (pesos) y `runs/rl/learning_curve.png` (curva de aprendizaje).
 
-Ver el agente RL entrenado jugando:
+Ver el agente RL entrenado jugando (escenario de entrenamiento):
 ```powershell
 python scripts/run_rl_agent.py
+```
+
+Ver el agente en niveles reales de FreeDoom E1M1:
+```powershell
+python scripts/run_freedoom_demo.py
 ```
 
 Correr la baseline de reglas (sin aprendizaje):
