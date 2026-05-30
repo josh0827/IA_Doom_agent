@@ -27,7 +27,7 @@ class RLEnv:
         weights: Path,
         scenario: Path,
         frame_skip: int = 4,
-        conf: float = 0.15,
+        conf: float = 0.08,
         window_visible: bool = False,
     ):
         self.env = DoomEnv(scenario, window_visible=window_visible)

@@ -3,7 +3,7 @@ from ultralytics import YOLO
 
 
 class Detector:
-    def __init__(self, weights_path: Path, conf: float = 0.25):
+    def __init__(self, weights_path: Path, conf: float = 0.08):
         self.model = YOLO(str(weights_path))
         self.conf = conf
 

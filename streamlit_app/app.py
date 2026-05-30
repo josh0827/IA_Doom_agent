@@ -23,7 +23,7 @@ with st.sidebar:
         help="DQN: aprende de la experiencia. Reglas: logica fija (baseline).",
     )
     max_steps = st.slider("Pasos por episodio", 100, 2000, 600, 100)
-    conf_yolo = st.slider("Confianza YOLO", 0.05, 0.50, 0.15, 0.05)
+    conf_yolo = st.slider("Confianza YOLO", 0.05, 0.50, 0.08, 0.01)
     st.divider()
     st.subheader("Acerca del proyecto")
     st.markdown(
