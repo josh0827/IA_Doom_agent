@@ -8,7 +8,10 @@ __pycache__/
 models/
 dataset/
 runs/
+!runs/doom-v1/weights/best.pt
+!runs/doom-v1/results.csv
 *.pt
+!runs/doom-v1/weights/best.pt
 *.onnx
 
 .ipynb_checkpoints/
