@@ -9,7 +9,7 @@ ENEMIGOS = {
 
 def decidir(result, vida: int, ammo: int, frame_w: int) -> Action:
     if result is None or len(result.boxes) == 0:
-        return Action.TURN_RIGHT
+        return Action.MOVE_FORWARD  # sin enemigos: avanzar por el pasillo
 
     centro_x = frame_w / 2
     enemigos = []

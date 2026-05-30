@@ -17,6 +17,7 @@ runs/
 .ipynb_checkpoints/
 .streamlit/
 .cache/
+diagnostico/
 
 .idea/
 .vscode/

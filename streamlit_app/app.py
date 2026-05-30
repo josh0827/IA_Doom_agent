@@ -8,7 +8,7 @@ from src.utils.metrics import FPSCounter
 
 ROOT = Path(__file__).resolve().parent.parent
 WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
-SCENARIO = ROOT / "src" / "env" / "scenarios" / "basic.cfg"
+SCENARIO = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
 
 st.set_page_config(page_title="Agente Doom", layout="wide")
 st.title("Agente Doom con YOLO + Politica")
