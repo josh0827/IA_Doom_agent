@@ -5,12 +5,14 @@ runs/rl/learning_curve.png. Soporta reanudar desde un checkpoint.
 
 Uso:
     python scripts/train_rl.py --episodes 400
+    python scripts/train_rl.py --episodes 400 --resume --window  # ver mientras entrena
 """
 import argparse
 import sys
 from collections import deque
 from pathlib import Path
 
+import cv2
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -19,6 +21,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.env.rl_env import RLEnv
+from src.perception.visualization import draw_detections
+from src.policy.actions import Action
 from src.policy.rl_agent import DQNAgent
 
 WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
@@ -54,6 +58,7 @@ def main():
     parser.add_argument("--max-steps", type=int, default=400, help="pasos (decisiones) por episodio")
     parser.add_argument("--frame-skip", type=int, default=4)
     parser.add_argument("--resume", action="store_true", help="reanudar desde checkpoint")
+    parser.add_argument("--window", action="store_true", help="mostrar ventana mientras entrena")
     args = parser.parse_args()
 
     if not WEIGHTS.exists():
@@ -83,6 +88,19 @@ def main():
                 agent.learn()
                 state = next_state
                 total += reward
+
+                if args.window:
+                    data = env.last_overlay_data
+                    if data is not None:
+                        frame, result = data
+                        overlay = draw_detections(frame, result)
+                        cv2.putText(overlay,
+                            f"Ep {ep} | eps={agent.epsilon():.2f} | {Action(action).name}",
+                            (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        cv2.imshow("Entrenando DQN", cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+                        if cv2.waitKey(1) & 0xFF == ord("q"):
+                            raise KeyboardInterrupt
+
                 if done:
                     break
 
@@ -102,6 +120,8 @@ def main():
                 plot_curve(rewards_hist, CURVE)
     finally:
         env.close()
+        if args.window:
+            cv2.destroyAllWindows()
         agent.save(OUT_DIR / "dqn_last.pt")
         plot_curve(rewards_hist, CURVE)
         print(f"\nGuardado: {CKPT} (mejor) y {OUT_DIR/'dqn_last.pt'} (ultimo)")
