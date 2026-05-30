@@ -24,8 +24,10 @@ class DoomEnv:
         self.game.set_window_visible(window_visible)
         self.game.set_screen_format(vzd.ScreenFormat.RGB24)
         self.game.init()
+        self._last_info = {"vida": 100, "ammo": 0, "kills": 0}
 
     def reset(self):
+        self._last_info = {"vida": 100, "ammo": 0, "kills": 0}
         self.game.new_episode()
         return self._frame()
 
@@ -35,12 +37,14 @@ class DoomEnv:
         done = self.game.is_episode_finished()
         frame = None if done else self._frame()
         state = self.game.get_state()
-        info = {
-            "vida": self.game.get_game_variable(vzd.GameVariable.HEALTH) if state else 0,
-            "ammo": self.game.get_game_variable(vzd.GameVariable.AMMO2) if state else 0,
-            "kills": self.game.get_game_variable(vzd.GameVariable.KILLCOUNT) if state else 0,
-        }
-        return frame, reward, done, info
+        if state:
+            self._last_info = {
+                "vida":  self.game.get_game_variable(vzd.GameVariable.HEALTH),
+                "ammo":  self.game.get_game_variable(vzd.GameVariable.AMMO2),
+                "kills": self.game.get_game_variable(vzd.GameVariable.KILLCOUNT),
+            }
+        # Al morir (state=None) devuelve el ultimo valor conocido para no perder kills.
+        return frame, reward, done, dict(self._last_info)
 
     def _frame(self):
         state = self.game.get_state()
