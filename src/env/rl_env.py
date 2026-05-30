@@ -15,8 +15,10 @@ from src.perception.detector import Detector
 from src.perception.features import STATE_DIM, extract_state
 from src.policy.actions import Action, action_to_vizdoom
 
-KILL_REWARD = 20.0
-HEALTH_PENALTY = 0.1
+# Balance de recompensa: matar debe ser mas rentable que solo correr.
+PROGRESS_SCALE = 0.5   # atenua el reward de avanzar del escenario
+KILL_REWARD = 100.0    # premio fuerte por cada baja
+HEALTH_PENALTY = 0.5   # penaliza recibir dano (no matar => recibir disparos)
 
 
 class RLEnv:
@@ -54,7 +56,7 @@ class RLEnv:
         frame, reward_env, done, info = self.env.step(
             action_to_vizdoom(action), tics=self.frame_skip
         )
-        reward = float(reward_env)
+        reward = PROGRESS_SCALE * float(reward_env)
 
         if done or frame is None:
             next_state = np.zeros(self.state_dim, dtype=np.float32)
