@@ -23,7 +23,8 @@ def decidir(result, vida: int, ammo: int, frame_w: int) -> Action:
 
     if enemigos and ammo > 0:
         objetivo = min(enemigos, key=lambda e: abs(e[1] - centro_x))
-        if abs(objetivo[1] - centro_x) < 40:
+        distancia_x = abs(objetivo[1] - centro_x)
+        if distancia_x < frame_w * 0.25:  # 25% del ancho = zona de disparo amplia
             return Action.ATTACK
         return _girar_hacia(objetivo[1], centro_x)
 
