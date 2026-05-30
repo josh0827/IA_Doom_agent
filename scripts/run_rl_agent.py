@@ -1,8 +1,10 @@
 """Demo del agente DQN entrenado jugando Doom (politica greedy, ventana visible).
 
 Uso:
-    python scripts/run_rl_agent.py
+    python scripts/run_rl_agent.py                # juega en bucle hasta pulsar 'q'
+    python scripts/run_rl_agent.py --episodes 10  # juega 10 partidas
 """
+import argparse
 import sys
 from pathlib import Path
 
@@ -21,7 +23,8 @@ SCENARIO = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
 CKPT = ROOT / "runs" / "rl" / "dqn.pt"
 
 
-def main(episodios: int = 5, max_steps: int = 400):
+def main(episodios: int = 0, max_steps: int = 400):
+    """episodios=0 -> bucle infinito hasta pulsar 'q'."""
     if not CKPT.exists():
         print(f"Falta el agente entrenado: {CKPT}. Entrena con scripts/train_rl.py")
         return
@@ -29,11 +32,15 @@ def main(episodios: int = 5, max_steps: int = 400):
     env = RLEnv(WEIGHTS, SCENARIO, frame_skip=4, window_visible=True)
     agent = DQNAgent(env.state_dim, env.n_actions)
     agent.load(CKPT)
+    print("Pulsa 'q' en la ventana del juego para salir.")
 
+    ep = 0
     try:
-        for ep in range(1, episodios + 1):
+        while episodios == 0 or ep < episodios:
+            ep += 1
             state = env.reset()
             total = 0.0
+            info = {}
             for _ in range(max_steps):
                 action = agent.act(state, greedy=True)
                 state, reward, done, info = env.step(action)
@@ -44,7 +51,7 @@ def main(episodios: int = 5, max_steps: int = 400):
                     frame, result = data
                     overlay = draw_detections(frame, result)
                     cv2.putText(
-                        overlay, f"Accion: {Action(action).name}", (8, 24),
+                        overlay, f"Ep {ep}  Accion: {Action(action).name}", (8, 24),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2,
                     )
                     cv2.imshow("agente doom RL", cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
@@ -59,4 +66,9 @@ def main(episodios: int = 5, max_steps: int = 400):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--episodes", type=int, default=0,
+                        help="numero de partidas (0 = bucle infinito hasta 'q')")
+    parser.add_argument("--max-steps", type=int, default=400)
+    args = parser.parse_args()
+    main(episodios=args.episodes, max_steps=args.max_steps)
