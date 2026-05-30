@@ -11,20 +11,34 @@ Agente que juega Doom en tiempo real combinando un detector YOLO entrenado con d
 
 ## Arquitectura
 
+El detector YOLO actúa como **extractor de percepción**: convierte cada frame en un vector
+de features (¿hay enemigo?, a qué lado, qué tan cerca, vida, ammo). Un agente **DQN
+(Reinforcement Learning)** aprende, sobre ese vector, qué acción tomar para sobrevivir y
+avanzar, mejorando episodio a episodio.
+
 ```
-Streamlit App
-     │
-Agent Runner (loop percibir → decidir → actuar)
-     │
-     ├── Perception (YOLO) ──┐
-     │                       ├──→ Policy (reglas)
-     └── ViZDoom env ←───────┘
+            ViZDoom env (deadly_corridor)
+                   │ frame
+                   ▼
+        Perception (YOLO) ── detecciones
+                   │
+                   ▼
+   features.py → vector de estado (8 dims)
+                   │
+                   ▼
+        Policy DQN (aprende) ── acción
+                   │
+                   └────────────► ViZDoom (frame-skip)
 ```
+
+Se conserva una **política de reglas** (`src/policy/rules.py`) como *baseline* para comparar
+contra el agente que aprende.
 
 ## Stack
 
 - Python 3.10+
-- Ultralytics YOLOv8
+- Ultralytics YOLOv8 (percepción)
+- PyTorch (agente DQN)
 - ViZDoom
 - OpenCV
 - Streamlit
@@ -44,11 +58,11 @@ Después descargar el dataset desde Roboflow (link pendiente) y colocar en `data
 ## Estructura
 
 ```
-src/perception/   detector YOLO y visualización
-src/policy/       política de decisión (reglas)
-src/env/          wrapper de ViZDoom
-src/agent/        orquestación del loop principal
-scripts/          entrenamiento, evaluación, captura
+src/perception/   detector YOLO, visualización y extractor de features (features.py)
+src/policy/       agente DQN (dqn.py, rl_agent.py) + política de reglas baseline (rules.py)
+src/env/          wrapper de ViZDoom (doom_env.py) y entorno RL (rl_env.py)
+src/agent/        orquestación del loop con reglas
+scripts/          entrenamiento detector/RL, evaluación, demos
 streamlit_app/    interfaz web
 docs/             arquitectura y reporte académico
 ```
@@ -60,7 +74,18 @@ Entrenar el detector:
 python scripts/train_detector.py
 ```
 
-Correr el agente en modo debug (sin web):
+Entrenar el agente DQN (Reinforcement Learning):
+```powershell
+python scripts/train_rl.py --episodes 400
+```
+Genera `runs/rl/dqn.pt` (pesos) y `runs/rl/learning_curve.png` (curva de aprendizaje).
+
+Ver el agente RL entrenado jugando:
+```powershell
+python scripts/run_rl_agent.py
+```
+
+Correr la baseline de reglas (sin aprendizaje):
 ```powershell
 python scripts/run_agent.py
 ```

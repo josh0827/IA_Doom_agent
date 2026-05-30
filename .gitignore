@@ -8,11 +8,13 @@ __pycache__/
 models/
 dataset/
 runs/
+*.pt
+*.onnx
+# Artefactos que SI se versionan (modelo y resultados del proyecto)
 !runs/doom-v1/weights/best.pt
 !runs/doom-v1/results.csv
-*.pt
-!runs/doom-v1/weights/best.pt
-*.onnx
+!runs/rl/dqn.pt
+!runs/rl/learning_curve.png
 
 .ipynb_checkpoints/
 .streamlit/

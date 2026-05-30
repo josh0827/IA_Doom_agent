@@ -19,14 +19,16 @@ class DoomEnv:
         self.game.new_episode()
         return self._frame()
 
-    def step(self, action_vector: list[int]):
-        reward = self.game.make_action(action_vector)
+    def step(self, action_vector: list[int], tics: int = 1):
+        # tics > 1 aplica la misma accion varios frames (frame-skip).
+        reward = self.game.make_action(action_vector, tics)
         done = self.game.is_episode_finished()
         frame = None if done else self._frame()
         state = self.game.get_state()
         info = {
             "vida": self.game.get_game_variable(vzd.GameVariable.HEALTH) if state else 0,
             "ammo": self.game.get_game_variable(vzd.GameVariable.AMMO2) if state else 0,
+            "kills": self.game.get_game_variable(vzd.GameVariable.KILLCOUNT) if state else 0,
         }
         return frame, reward, done, info
 
