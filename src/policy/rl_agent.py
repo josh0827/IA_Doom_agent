@@ -20,7 +20,7 @@ class DQNAgent:
         target_update: int = 1000,
         eps_start: float = 1.0,
         eps_end: float = 0.05,
-        eps_decay_steps: int = 40_000,
+        eps_decay_steps: int = 20_000,
         device: str | None = None,
     ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")

@@ -81,11 +81,14 @@ def main():
         for ep in range(1, args.episodes + 1):
             state = env.reset()
             total = 0.0
+            losses = []
             for _ in range(args.max_steps):
                 action = agent.act(state)
                 next_state, reward, done, info = env.step(action)
                 agent.buffer.push(state, action, reward, next_state, float(done))
-                agent.learn()
+                loss = agent.learn()
+                if loss is not None:
+                    losses.append(loss)
                 state = next_state
                 total += reward
 
@@ -107,9 +110,11 @@ def main():
             rewards_hist.append(total)
             recientes.append(total)
             media = sum(recientes) / len(recientes)
+            loss_str = f"{sum(losses)/len(losses):.4f}" if losses else "  N/A  "
             print(
-                f"Ep {ep:4d}/{args.episodes} | reward={total:8.1f} | "
-                f"media20={media:8.1f} | eps={agent.epsilon():.3f} | steps={agent.steps}"
+                f"Ep {ep:4d}/{args.episodes} | reward={total:7.1f} | "
+                f"media20={media:7.1f} | eps={agent.epsilon():.3f} | "
+                f"loss={loss_str} | steps={agent.steps}"
             )
 
             # Checkpoint del mejor modelo (por media movil) y curva periodica.
