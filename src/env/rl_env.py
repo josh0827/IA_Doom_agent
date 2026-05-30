@@ -16,7 +16,7 @@ from src.perception.features import STATE_DIM, extract_state
 from src.policy.actions import Action, action_to_vizdoom
 
 # Balance de recompensa: matar debe ser mas rentable que solo correr.
-PROGRESS_SCALE = 0.5   # atenua el reward de avanzar del escenario
+PROGRESS_SCALE = 0.0   # sin recompensa por avanzar: matar es la UNICA forma de ganar
 KILL_REWARD = 100.0    # premio fuerte por cada baja
 HEALTH_PENALTY = 0.5   # penaliza recibir dano (no matar => recibir disparos)
 

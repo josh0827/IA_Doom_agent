@@ -14,7 +14,7 @@ class AgentRunner:
     def run_episode(self, max_steps: int = 2000):
         frame = self.env.reset()
         total_reward = 0.0
-        info = {"vida": 100, "ammo": 50}
+        info = {"vida": 100, "ammo": 50, "kills": 0}
 
         for step in range(max_steps):
             if frame is None:
