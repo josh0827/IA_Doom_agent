@@ -44,7 +44,9 @@ class DoomEnv:
                 "kills": self.game.get_game_variable(vzd.GameVariable.KILLCOUNT),
             }
         # Al morir (state=None) devuelve el ultimo valor conocido para no perder kills.
-        return frame, reward, done, dict(self._last_info)
+        info = dict(self._last_info)
+        info["dead"] = self.game.is_player_dead()  # fiable aunque state sea None
+        return frame, reward, done, info
 
     def _frame(self):
         state = self.game.get_state()
