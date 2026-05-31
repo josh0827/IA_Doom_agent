@@ -18,7 +18,8 @@ from src.perception.features import STATE_DIM, extract_state
 from src.policy.actions import Action, action_to_vizdoom
 
 KILL_REWARD    = 100.0
-PROGRESS_SCALE = 0.1   # pequeno incentivo para avanzar (sin dominar sobre matar)
+SHOOT_REWARD   = 8.0   # bonus por disparar cuando hay enemigo visible (senal densa)
+PROGRESS_SCALE = 0.0   # sin progreso: solo matar importa
 HEALTH_PENALTY = 0.5
 
 
@@ -62,7 +63,7 @@ class RLEnv:
         frame, reward_env, done, info = self.env.step(
             action_to_vizdoom(action), tics=self.frame_skip
         )
-        reward = PROGRESS_SCALE * float(reward_env)
+        reward = 0.0  # sin progreso
 
         if done or frame is None:
             self._last_overlay_data = None
@@ -99,7 +100,10 @@ class RLEnv:
                         enemy_centered = True
                     break
 
-        # AIM_REWARD eliminado: causaba disparar a falsos positivos con conf baja
+        # SHOOT_REWARD: bonus por disparar cuando hay enemigo visible (accion ATTACK)
+        from src.policy.actions import Action as _Action
+        if enemy_present and action_idx == _Action.ATTACK:
+            reward += SHOOT_REWARD
 
         # Actualizar contadores
         if enemy_present:
