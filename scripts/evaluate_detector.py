@@ -4,7 +4,7 @@ from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-DATA_YAML = ROOT / "dataset" / "doom-yolo" / "data.yaml"
+DATA_YAML = ROOT / "dataset" / "doom-vizdoom" / "data.yaml"
 
 from src.utils.paths import detector_weights
 
