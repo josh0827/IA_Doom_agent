@@ -18,7 +18,7 @@ from pathlib import Path
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_YAML = ROOT / "dataset" / "doom-yolo" / "data.yaml"
+DATA_YAML = ROOT / "dataset" / "doom-vizdoom" / "data.yaml"
 
 
 def main(model_size: str = "s", epochs: int = 100):
@@ -42,7 +42,7 @@ def main(model_size: str = "s", epochs: int = 100):
         hsv_v=0.5,         # mas variacion de brillo — entornos oscuros de Doom
         device=0,          # GPU 0 (RTX) — cambiar a "cpu" si no hay GPU
         project=str(ROOT / "runs"),
-        name="doom-v2",
+        name="doom-v3",
         exist_ok=True,
     )
 
