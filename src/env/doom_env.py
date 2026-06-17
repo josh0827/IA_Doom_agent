@@ -52,7 +52,14 @@ class DoomEnv:
             }
         # Al morir (state=None) devuelve el ultimo valor conocido para no perder kills.
         info = dict(self._last_info)
-        info["dead"] = self.game.is_player_dead()  # fiable aunque state sea None
+        dead = self.game.is_player_dead()
+        info["dead"] = dead  # fiable aunque state sea None
+        # Completo el nivel = termino vivo y ANTES del timeout (alcanzo el chaleco).
+        # Si agota el tiempo, get_episode_time() == get_episode_timeout().
+        info["completed"] = bool(
+            done and not dead
+            and self.game.get_episode_time() < self.game.get_episode_timeout()
+        )
         return frame, reward, done, info
 
     def _frame(self):
