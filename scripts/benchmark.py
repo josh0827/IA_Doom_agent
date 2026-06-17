@@ -2,9 +2,10 @@ from pathlib import Path
 
 from src.agent.runner import AgentRunner
 from src.utils.metrics import FPSCounter
+from src.utils.paths import detector_weights
 
 ROOT = Path(__file__).resolve().parent.parent
-WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
+WEIGHTS = detector_weights()
 SCENARIO = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
 
 
