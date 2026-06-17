@@ -1,16 +1,21 @@
+import sys
 from pathlib import Path
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 DATA_YAML = ROOT / "dataset" / "doom-yolo" / "data.yaml"
-WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
+
+from src.utils.paths import detector_weights
 
 
 def main():
-    if not WEIGHTS.exists():
-        print(f"No existe el modelo: {WEIGHTS}")
-        print("Ejecuta primero scripts/train_detector.py")
+    try:
+        WEIGHTS = detector_weights()
+    except FileNotFoundError as e:
+        print(e)
         return
+    print(f"Evaluando: {WEIGHTS}")
     model = YOLO(str(WEIGHTS))
     metrics = model.val(data=str(DATA_YAML))
     print(f"mAP@0.5: {metrics.box.map50:.4f}")

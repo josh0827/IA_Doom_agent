@@ -16,12 +16,14 @@ import cv2
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from src.env.frame_stack import FrameStack
 from src.env.rl_env import RLEnv
 from src.policy.rl_agent import DQNAgent
 from src.policy.actions import Action
 from src.perception.visualization import draw_detections
+from src.utils.paths import detector_weights
 
-WEIGHTS  = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
+WEIGHTS  = detector_weights()
 SCENARIO = ROOT / "src" / "env" / "scenarios" / "freedoom.cfg"
 CKPT     = ROOT / "runs" / "rl" / "dqn.pt"
 WAD      = ROOT / "src" / "env" / "scenarios" / "freedoom1.wad"
@@ -37,7 +39,7 @@ def main(episodios: int = 0, max_steps: int = 2000):
         print("Entrena con: python scripts/train_rl.py --episodes 400")
         return
 
-    env = RLEnv(WEIGHTS, SCENARIO, frame_skip=4, window_visible=True)
+    env = FrameStack(RLEnv(WEIGHTS, SCENARIO, frame_skip=2, window_visible=True), n_frames=3)
     agent = DQNAgent(env.state_dim, env.n_actions)
     agent.load(CKPT)
     print("FreeDoom E1M1 | Pulsa 'q' para salir.")

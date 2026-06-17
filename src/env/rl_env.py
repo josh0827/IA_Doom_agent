@@ -1,19 +1,25 @@
 """Entorno RL: envuelve ViZDoom + detector YOLO.
 
-Observacion: vector de 10 features (ver perception/features.py).
+Observacion: vector de 13 features (ver perception/features.py).
 
 Recompensa (shaping):
   + KILL_REWARD     por cada baja confirmada (objetivo principal)
-  + SHOOT_REWARD    senal densa por disparar cuando hay enemigo visible
-  + HEALTH_PENALTY  penaliza recibir danio (delta de vida negativo)
+  + SHOOT_REWARD      senal densa por disparar cuando hay enemigo visible
+  - WASTE_SHOT_PENALTY penaliza disparar sin enemigo visible (dispara a la nada)
+  + STRAFE_REWARD   bonus por esquivar (strafe) cuando hay enemigo a la vista
+  - HEALTH_PENALTY  penaliza recibir danio (delta de vida negativo)
   - DEATH_PENALTY   castigo explicito por morir
+  + SURVIVAL_BONUS  premio minimo por cada paso vivo (incentiva no suicidarse)
   + PROGRESS_SCALE  fraccion del reward nativo del escenario (avanzar por el
                     corredor); incluye living_reward y death_penalty nativos,
                     pero atenuados para que NO dominen sobre matar.
 
-Espacio de accion: 5 acciones utiles (MOVE_FORWARD, MOVE_BACKWARD, TURN_LEFT,
-TURN_RIGHT, ATTACK). Se excluyen USE e IDLE (inutiles en el corredor y la
-segunda haria que el agente se congele recibiendo disparos).
+Espacio de accion: 13 acciones (incluye strafe y acciones combinadas).
+  0 MOVE_FORWARD        5 STRAFE_LEFT          10 TURN_LEFT_ATTACK
+  1 MOVE_BACKWARD       6 STRAFE_RIGHT         11 TURN_RIGHT_ATTACK
+  2 TURN_LEFT           7 FORWARD_ATTACK       12 BACKWARD_ATTACK
+  3 TURN_RIGHT          8 STRAFE_LEFT_ATTACK
+  4 ATTACK              9 STRAFE_RIGHT_ATTACK
 """
 from pathlib import Path
 
@@ -25,13 +31,32 @@ from src.perception.features import STATE_DIM, extract_state
 from src.policy.actions import Action, action_to_vizdoom
 from src.policy.rules import ENEMIGOS
 
-N_ACTIONS = 5          # Action 0..4 = FORWARD, BACKWARD, LEFT, RIGHT, ATTACK
+N_ACTIONS = 13
 
-KILL_REWARD    = 100.0
-SHOOT_REWARD   = 1.0   # bonus suave por disparar con enemigo a la vista
-HEALTH_PENALTY = 0.5   # por punto de vida perdido
-DEATH_PENALTY  = 30.0  # castigo explicito al morir
-PROGRESS_SCALE = 0.05  # incentivo suave de avanzar (reward nativo del escenario)
+KILL_REWARD       = 150.0
+SHOOT_REWARD      = 2.0   # disparar CON enemigo visible
+WASTE_SHOT_PENALTY = 1.5  # disparar SIN enemigo visible (se resta)
+STRAFE_REWARD     = 0.8   # esquivar con enemigo visible
+HEALTH_PENALTY    = 0.8
+DEATH_PENALTY     = 50.0
+SURVIVAL_BONUS    = 0.02
+PROGRESS_SCALE    = 0.02   # empuje suave hacia adelante sin dominar sobre matar
+
+# Confianza minima para que una deteccion cuente como "enemigo de combate" en la
+# recompensa. Mas estricta que el umbral del detector (0.40): evita que un falso
+# positivo marginal haga que disparar a la nada cobre SHOOT_REWARD en lugar de
+# pagar WASTE_SHOT_PENALTY. Es el dial que rompe el "disparar a fantasmas".
+COMBAT_CONF = 0.5
+
+_STRAFE_ACTIONS = {Action.STRAFE_LEFT, Action.STRAFE_RIGHT,
+                   Action.STRAFE_LEFT_ATTACK, Action.STRAFE_RIGHT_ATTACK,
+                   Action.BACKWARD_ATTACK}  # kiting tambien es evasion
+_SHOOT_ACTIONS  = {Action.ATTACK, Action.FORWARD_ATTACK,
+                   Action.STRAFE_LEFT_ATTACK, Action.STRAFE_RIGHT_ATTACK,
+                   Action.TURN_LEFT_ATTACK, Action.TURN_RIGHT_ATTACK,
+                   Action.BACKWARD_ATTACK}
+
+_MAX_DEPTH = 1000.0  # combate tipico ocurre a 200-800 unidades, mejor resolucion
 
 
 class RLEnv:
@@ -39,11 +64,12 @@ class RLEnv:
         self,
         weights: Path,
         scenario: Path,
-        frame_skip: int = 4,
-        conf: float = 0.12,
+        frame_skip: int = 2,
+        conf: float = 0.40,  # ver nota en Detector: umbral alto contra falsos positivos
         window_visible: bool = False,
+        skill: int | None = None,
     ):
-        self.env = DoomEnv(scenario, window_visible=window_visible)
+        self.env = DoomEnv(scenario, window_visible=window_visible, skill=skill)
         self.detector = Detector(weights, conf=conf)
         self.frame_skip = frame_skip
         self.state_dim = STATE_DIM
@@ -67,7 +93,8 @@ class RLEnv:
         result = self.detector.predict(frame)
         self._last_overlay_data = (frame, result)
         return extract_state(result, self._prev_health, ammo,
-                             self._frame_w, self._steps_no_enemy, 0.0)
+                             self._frame_w, self._steps_no_enemy, 0.0,
+                             self._enemy_distance(result))
 
     def step(self, action_idx: int):
         action = Action(action_idx)
@@ -93,6 +120,7 @@ class RLEnv:
 
         reward += KILL_REWARD * delta_kills
         reward += HEALTH_PENALTY * delta_health           # penaliza danio recibido
+        reward += SURVIVAL_BONUS                          # sobrevivir tiene valor
 
         # ── Percepcion: hay enemigo a la vista? ───────────────────────────────
         result = self.detector.predict(frame)
@@ -101,13 +129,22 @@ class RLEnv:
         enemy_present = False
         if result is not None and len(result.boxes) > 0:
             for box in result.boxes:
-                if result.names[int(box.cls[0])] in ENEMIGOS:
+                if (result.names[int(box.cls[0])] in ENEMIGOS
+                        and float(box.conf[0]) >= COMBAT_CONF):
                     enemy_present = True
                     break
 
-        # Senal densa: disparar cuando hay enemigo visible guia hacia el kill.
-        if enemy_present and action == Action.ATTACK:
+        # Disparar CON enemigo visible: senal densa hacia el kill.
+        if enemy_present and action in _SHOOT_ACTIONS:
             reward += SHOOT_REWARD
+
+        # Disparar SIN enemigo visible: penalizar (dispara a la nada).
+        if not enemy_present and action in _SHOOT_ACTIONS:
+            reward -= WASTE_SHOT_PENALTY
+
+        # Strafe con enemigo visible: comportamiento de evasion humano.
+        if enemy_present and action in _STRAFE_ACTIONS:
+            reward += STRAFE_REWARD
 
         self._steps_no_enemy = 0 if enemy_present else self._steps_no_enemy + 1
         self._prev_kills  = kills
@@ -116,8 +153,30 @@ class RLEnv:
         next_state = extract_state(
             result, vida, ammo, self._frame_w,
             self._steps_no_enemy, took_damage,
+            self._enemy_distance(result),
         )
         return next_state, reward, False, info
+
+    def _enemy_distance(self, result) -> float:
+        """Distancia normalizada al enemigo mas cercano usando el depth buffer."""
+        depth = self.env.depth_buffer
+        if depth is None or result is None or len(result.boxes) == 0:
+            return 1.0  # desconocido = lejos
+        centro_x = self._frame_w / 2
+        best_cx, best_dist = None, float("inf")
+        for box in result.boxes:
+            if result.names[int(box.cls[0])] not in ENEMIGOS:
+                continue
+            x1, _, x2, _ = box.xyxy[0].tolist()
+            cx = (x1 + x2) / 2
+            if abs(cx - centro_x) < best_dist:
+                best_dist = abs(cx - centro_x)
+                best_cx = int(np.clip(cx, 0, depth.shape[1] - 1))
+        if best_cx is None:
+            return 1.0
+        cy = depth.shape[0] // 2
+        dist = float(depth[cy, best_cx])
+        return float(np.clip(dist / _MAX_DEPTH, 0.0, 1.0))
 
     @property
     def last_overlay_data(self):

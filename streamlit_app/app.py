@@ -4,8 +4,15 @@ import cv2
 import numpy as np
 import streamlit as st
 
+import sys
 ROOT = Path(__file__).resolve().parent.parent
-WEIGHTS   = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
+sys.path.insert(0, str(ROOT))
+
+from src.utils.paths import detector_weights
+try:
+    WEIGHTS = detector_weights()
+except FileNotFoundError:
+    WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"  # fallback para mostrar error claro
 SCENARIO  = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
 CKPT_RL   = ROOT / "runs" / "rl" / "dqn.pt"
 CURVE_IMG = ROOT / "runs" / "rl" / "learning_curve.png"
@@ -23,14 +30,15 @@ with st.sidebar:
         help="DQN: aprende de la experiencia. Reglas: logica fija (baseline).",
     )
     max_steps = st.slider("Pasos por episodio", 100, 2000, 600, 100)
-    conf_yolo = st.slider("Confianza YOLO", 0.05, 0.50, 0.08, 0.01)
+    conf_yolo = st.slider("Confianza YOLO", 0.05, 0.70, 0.40, 0.01)
     st.divider()
     st.subheader("Acerca del proyecto")
     st.markdown(
         "**Percepcion:** YOLOv8n entrenado sobre Doom-Enemy-Detection v4 "
         "(668 imágenes, 10 clases de enemigos).  \n"
-        "**Politica:** DQN (MLP 8→128→128→7) entrenado 400 episodios "
-        "sobre features YOLO + vida + ammo."
+        "**Politica:** Double DQN con Dueling architecture "
+        "(12→256→256 + cabezas V/A) entrenado 600 episodios.  \n"
+        "**Acciones:** 10 (strafe, disparo+movimiento simultaneo)."
     )
     if CURVE_IMG.exists():
         st.image(str(CURVE_IMG), caption="Curva de aprendizaje DQN", use_column_width=True)
@@ -65,6 +73,7 @@ def _overlay_action(frame: np.ndarray, label: str) -> np.ndarray:
 # ── Loop principal ─────────────────────────────────────────────────────────────
 def run_dqn():
     import sys; sys.path.insert(0, str(ROOT))
+    from src.env.frame_stack import FrameStack
     from src.env.rl_env import RLEnv
     from src.policy.rl_agent import DQNAgent
     from src.policy.actions import Action
@@ -75,7 +84,7 @@ def run_dqn():
         st.error(f"Falta el modelo RL en {CKPT_RL}. Entrena con scripts/train_rl.py")
         return
 
-    env   = RLEnv(WEIGHTS, SCENARIO, frame_skip=4, conf=conf_yolo, window_visible=False)
+    env   = FrameStack(RLEnv(WEIGHTS, SCENARIO, frame_skip=2, conf=conf_yolo, window_visible=False), n_frames=3)
     agent = DQNAgent(env.state_dim, env.n_actions)
     agent.load(CKPT_RL)
     fps = FPSCounter()

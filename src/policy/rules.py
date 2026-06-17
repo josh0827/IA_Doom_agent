@@ -2,11 +2,18 @@ import random
 
 from src.policy.actions import Action
 
-ENEMIGOS = {
+# Las 10 clases del detector (referencia / dataset Roboflow).
+ENEMIGOS_TODOS = {
     "imp", "cacodemon", "baron-of-hell", "cyberdemon",
     "lost-soul", "pinky", "shotgun-guy", "specter",
     "spiderdemon", "zombieman",
 }
+
+# Clases que el detector reconoce de forma fiable (AP@0.5 > 0.6 en doom-v2) y que
+# aparecen en los escenarios jugados (deadly_corridor / freedoom E1M1). Las demas
+# tienen AP~0 (baron-of-hell) o sin datos de validacion (cacodemon, cyberdemon,
+# lost-soul, spiderdemon) y solo aportan falsos positivos, asi que las ignoramos.
+ENEMIGOS = {"zombieman", "imp", "pinky", "shotgun-guy"}
 
 # Umbral horizontal: si el enemigo esta dentro de este % del ancho, dispara.
 ZONA_DISPARO = 0.20

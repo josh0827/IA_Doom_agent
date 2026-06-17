@@ -3,7 +3,7 @@ import vizdoom as vzd
 
 
 class DoomEnv:
-    def __init__(self, scenario_cfg: Path, window_visible: bool = False):
+    def __init__(self, scenario_cfg: Path, window_visible: bool = False, skill: int | None = None):
         self.game = vzd.DoomGame()
         self.game.load_config(str(scenario_cfg))
         # Inyecta el .wad buscando en este orden:
@@ -21,10 +21,17 @@ class DoomEnv:
             if wad.exists():
                 self.game.set_doom_scenario_path(str(wad))
                 break
+        if skill is not None:
+            self.game.set_doom_skill(skill)
         self.game.set_window_visible(window_visible)
         self.game.set_screen_format(vzd.ScreenFormat.RGB24)
+        self.game.set_depth_buffer_enabled(True)
+        # Renderizado por GPU (OpenGL) en vez de software renderer por defecto.
+        # Acelera la generacion de frames, especialmente con depth buffer activo.
+        self.game.add_game_args("+vid_renderer opengl +gl_multisample 0")
         self.game.init()
         self._last_info = {"vida": 100, "ammo": 0, "kills": 0}
+        self._last_depth = None
 
     def reset(self):
         self._last_info = {"vida": 100, "ammo": 0, "kills": 0}
@@ -51,8 +58,14 @@ class DoomEnv:
     def _frame(self):
         state = self.game.get_state()
         if state is None:
+            self._last_depth = None
             return None
+        self._last_depth = state.depth_buffer  # (H, W) float32, distancia en unidades Doom
         return state.screen_buffer  # ViZDoom 1.3+ devuelve (H, W, 3) directamente
+
+    @property
+    def depth_buffer(self):
+        return self._last_depth
 
     def close(self):
         self.game.close()

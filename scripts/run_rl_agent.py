@@ -13,12 +13,14 @@ import cv2
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from src.env.frame_stack import FrameStack
 from src.env.rl_env import RLEnv
 from src.policy.rl_agent import DQNAgent
 from src.policy.actions import Action
 from src.perception.visualization import draw_detections
+from src.utils.paths import detector_weights
 
-WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
+WEIGHTS = detector_weights()
 SCENARIO = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
 CKPT = ROOT / "runs" / "rl" / "dqn.pt"
 
@@ -29,7 +31,7 @@ def main(episodios: int = 0, max_steps: int = 400):
         print(f"Falta el agente entrenado: {CKPT}. Entrena con scripts/train_rl.py")
         return
 
-    env = RLEnv(WEIGHTS, SCENARIO, frame_skip=4, window_visible=True)
+    env = FrameStack(RLEnv(WEIGHTS, SCENARIO, frame_skip=2, window_visible=True), n_frames=3)
     agent = DQNAgent(env.state_dim, env.n_actions)
     agent.load(CKPT)
     print("Pulsa 'q' en la ventana del juego para salir.")

@@ -4,9 +4,10 @@ import cv2
 
 from src.agent.runner import AgentRunner
 from src.perception.visualization import draw_detections
+from src.utils.paths import detector_weights
 
 ROOT = Path(__file__).resolve().parent.parent
-WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"
+WEIGHTS = detector_weights()
 SCENARIO = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
 
 
