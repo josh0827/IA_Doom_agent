@@ -10,9 +10,11 @@ Recompensa (shaping):
   - HEALTH_PENALTY  penaliza recibir danio (delta de vida negativo)
   - DEATH_PENALTY   castigo explicito por morir
   + SURVIVAL_BONUS  premio minimo por cada paso vivo (incentiva no suicidarse)
-  + PROGRESS_SCALE  fraccion del reward nativo del escenario (avanzar por el
-                    corredor); incluye living_reward y death_penalty nativos,
-                    pero atenuados para que NO dominen sobre matar.
+  + PROGRESS_SCALE  fraccion del reward nativo del escenario = avanzar hacia el
+                    chaleco del final del corredor (senal densa de progreso);
+                    incluye living_reward y death_penalty nativos.
+  + GOAL_REWARD     premio terminal por COMPLETAR el nivel (alcanzar el chaleco
+                    vivo, antes del timeout). Hace explicito "llegar al final".
 
 Espacio de accion: 13 acciones (incluye strafe y acciones combinadas).
   0 MOVE_FORWARD        5 STRAFE_LEFT          10 TURN_LEFT_ATTACK
@@ -40,7 +42,8 @@ STRAFE_REWARD     = 0.8   # esquivar con enemigo visible
 HEALTH_PENALTY    = 0.8
 DEATH_PENALTY     = 50.0
 SURVIVAL_BONUS    = 0.02
-PROGRESS_SCALE    = 0.02   # empuje suave hacia adelante sin dominar sobre matar
+PROGRESS_SCALE    = 0.10   # peso del avance hacia el chaleco (antes 0.02: casi invisible)
+GOAL_REWARD       = 150.0  # completar el nivel (llegar al chaleco vivo) = tan valioso como un kill
 
 # Confianza minima para que una deteccion cuente como "enemigo de combate" en la
 # recompensa. Mas estricta que el umbral del detector (0.40): evita que un falso
@@ -107,6 +110,8 @@ class RLEnv:
         if done or frame is None:
             if info.get("dead"):
                 reward -= DEATH_PENALTY
+            elif info.get("completed"):
+                reward += GOAL_REWARD   # llego al chaleco del final: objetivo logrado
             self._last_overlay_data = None
             state = np.zeros(self.state_dim, dtype=np.float32)
             return state, reward, True, info
