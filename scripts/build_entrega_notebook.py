@@ -111,8 +111,10 @@ cells.append(md(
 """## 5. Detector YOLO (percepcion)
 
 El detector se entreno **en LOCAL** (no aqui), para ahorrar tiempo de GPU en Kaggle. Esta
-celda **carga los pesos ya entrenados** (`doom-v4`). El proceso completo de como se
-construyo se documenta justo despues, pero **esas celdas son de referencia y no se ejecutan**.
+celda **carga los pesos ya entrenados** (`doom-v4`), que se adjuntan a este notebook como
+**Kaggle Dataset** (boton **Add Input** -> tu dataset con `best.pt`). El proceso completo de
+como se construyo se documenta justo despues, pero **esas celdas son de referencia y no se
+ejecutan**.
 
 **Metodo (resumen):** ViZDoom expone un `labels_buffer` con la posicion y el nombre de cada
 objeto en pantalla. Capturamos frames de varios escenarios y sacamos las cajas ground-truth
@@ -120,12 +122,14 @@ directo del motor (sin etiquetar a mano), mas frames vacios como fondo. Entrenam
 sobre ese dataset in-domain. Resultado en local: mAP@0.5 ~0.91, deteccion de pinky en la
 sala ~0.89."""))
 cells.append(code(
-'''import os
-from pathlib import Path
-os.makedirs("runs/doom-v4/weights", exist_ok=True)
-!wget -q -O runs/doom-v4/weights/best.pt https://raw.githubusercontent.com/josh0827/IA_Doom_agent/main/runs/doom-v4/weights/best.pt
-DETECTOR_WEIGHTS = Path("runs/doom-v4/weights/best.pt")
-print("detector v4 (entrenado en LOCAL):", DETECTOR_WEIGHTS.exists(),
+'''from pathlib import Path
+import glob
+# Detector v4 entrenado en LOCAL, adjuntado a este notebook como Kaggle Dataset.
+# (boton "Add Input" -> selecciona tu dataset que contiene best.pt)
+cand = glob.glob("/kaggle/input/**/best.pt", recursive=True)
+assert cand, "Falta el detector: agrega best.pt como Kaggle Dataset con 'Add Input'."
+DETECTOR_WEIGHTS = Path(cand[0])
+print("detector v4 (entrenado en LOCAL):", DETECTOR_WEIGHTS,
       DETECTOR_WEIGHTS.stat().st_size // 1024, "KB")'''))
 
 # Documentacion del proceso (NO se ejecuta): captura + auto-etiquetado + entreno en local.
