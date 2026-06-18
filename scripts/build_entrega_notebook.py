@@ -108,15 +108,28 @@ cells.append(code(code_of("src/perception/visualization.py")))
 
 # ── 4. Dataset auto-etiquetado + entreno detector ─────────────────────────────
 cells.append(md(
-"""## 5. Detector: dataset in-domain auto-etiquetado + entrenamiento
+"""## 5. Detector YOLO (percepcion)
 
-**Idea clave (lo que evita etiquetar a mano):** ViZDoom expone un `labels_buffer` con la
-posicion y el nombre de cada objeto en pantalla. Capturamos frames de varios escenarios y
-sacamos las cajas ground-truth directo del motor, mapeando los nombres del juego a nuestras
-clases. Incluimos frames vacios (sin enemigos) como fondo para reducir falsos positivos.
+El detector se entreno **en LOCAL** (no aqui), para ahorrar tiempo de GPU en Kaggle. Esta
+celda **carga los pesos ya entrenados** (`doom-v4`). El proceso completo de como se
+construyo se documenta justo despues, pero **esas celdas son de referencia y no se ejecutan**.
 
-Luego entrenamos YOLOv8s sobre ese dataset in-domain."""))
+**Metodo (resumen):** ViZDoom expone un `labels_buffer` con la posicion y el nombre de cada
+objeto en pantalla. Capturamos frames de varios escenarios y sacamos las cajas ground-truth
+directo del motor (sin etiquetar a mano), mas frames vacios como fondo. Entrenamos YOLOv8s
+sobre ese dataset in-domain. Resultado en local: mAP@0.5 ~0.91, deteccion de pinky en la
+sala ~0.89."""))
 cells.append(code(
+'''import os
+from pathlib import Path
+os.makedirs("runs/doom-v4/weights", exist_ok=True)
+!wget -q -O runs/doom-v4/weights/best.pt https://raw.githubusercontent.com/josh0827/IA_Doom_agent/main/runs/doom-v4/weights/best.pt
+DETECTOR_WEIGHTS = Path("runs/doom-v4/weights/best.pt")
+print("detector v4 (entrenado en LOCAL):", DETECTOR_WEIGHTS.exists(),
+      DETECTOR_WEIGHTS.stat().st_size // 1024, "KB")'''))
+
+# Documentacion del proceso (NO se ejecuta): captura + auto-etiquetado + entreno en local.
+_CAP_SRC = (
 '''import random, glob
 import cv2
 import numpy as np
@@ -187,17 +200,23 @@ def capturar(frames_por_scen=420, val_split=0.15, seed=0):
         f.write(f"nc: {len(CLASSES)}\\nnames: {CLASSES}\\n")
     print("total", saved, "| por clase:", {k:v for k,v in counts.items() if v})
 
-capturar()'''))
-cells.append(code(
+capturar()''')
+
+_TRAIN_SRC = (
 '''from ultralytics import YOLO
 
 det_model = YOLO("yolov8s.pt")
 det_model.train(data=str(DATA_DIR/"data.yaml"), epochs=60, imgsz=640, batch=16,
                 workers=2, cos_lr=True, patience=20, device=0,
                 project="runs", name="doom-v4", exist_ok=True, verbose=True)
-from pathlib import Path
-DETECTOR_WEIGHTS = Path("runs/doom-v4/weights/best.pt")
-print("detector listo:", DETECTOR_WEIGHTS, DETECTOR_WEIGHTS.exists())'''))
+DETECTOR_WEIGHTS = Path("runs/doom-v4/weights/best.pt")''')
+
+cells.append(md(
+"### Como se construyo el detector (ejecutado en LOCAL, no aqui)\n\n"
+"**1) Captura + auto-etiquetado desde ViZDoom** (cajas ground-truth, sin etiquetar a mano):\n\n"
+"```python\n" + _CAP_SRC + "\n```\n\n"
+"**2) Entrenamiento del detector YOLOv8s:**\n\n"
+"```python\n" + _TRAIN_SRC + "\n```"))
 
 # ── 5. Entorno: codigo ────────────────────────────────────────────────────────
 cells.append(md(
