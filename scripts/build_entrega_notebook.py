@@ -76,15 +76,24 @@ Escribimos el `.cfg` de `defend_the_center` con el layout de 8 botones que usa n
 politica. El `.wad` ya viene con el paquete `vizdoom`. La sala es una arena: el jugador en
 el centro y enemigos (Demons) que aparecen en los bordes y se acercan."""))
 cells.append(code(
+'import os\n'
 'os.makedirs("scenarios", exist_ok=True)\n'
 'CFG_DEFEND = "scenarios/defend_the_center.cfg"\n'
 'with open(CFG_DEFEND, "w") as f:\n'
 '    f.write(' + repr(defend_cfg) + ')\n'
 'print("cfg escrito:", CFG_DEFEND)'))
 
-# ── 3. Percepcion: codigo ─────────────────────────────────────────────────────
+# ── 3. Acciones ───────────────────────────────────────────────────────────────
 cells.append(md(
-"""## 3. Percepcion (David)
+"""## 3. Espacio de acciones
+
+Las 13 acciones del agente (mover, girar, disparar y combinadas). Se define primero porque
+los demas modulos la referencian (`Action`)."""))
+cells.append(code(code_of("src/policy/actions.py")))
+
+# ── 4. Percepcion: codigo ─────────────────────────────────────────────────────
+cells.append(md(
+"""## 4. Percepcion (David)
 
 El detector YOLO actua como extractor de percepcion. Dos piezas:
 
@@ -99,7 +108,7 @@ cells.append(code(code_of("src/perception/visualization.py")))
 
 # ── 4. Dataset auto-etiquetado + entreno detector ─────────────────────────────
 cells.append(md(
-"""## 4. Detector: dataset in-domain auto-etiquetado + entrenamiento
+"""## 5. Detector: dataset in-domain auto-etiquetado + entrenamiento
 
 **Idea clave (lo que evita etiquetar a mano):** ViZDoom expone un `labels_buffer` con la
 posicion y el nombre de cada objeto en pantalla. Capturamos frames de varios escenarios y
@@ -192,21 +201,20 @@ print("detector listo:", DETECTOR_WEIGHTS, DETECTOR_WEIGHTS.exists())'''))
 
 # ── 5. Entorno: codigo ────────────────────────────────────────────────────────
 cells.append(md(
-"""## 5. Entorno (Joshua)
+"""## 6. Entorno (Joshua)
 
 - `DoomEnv`: wrapper crudo de ViZDoom (frame, vida, ammo, kills, posicion, fin de nivel).
 - `RLEnv`: une ViZDoom + detector + features y define la **recompensa**. Es *scenario-aware*:
   en la sala (`defend_the_center`) premia **sobrevivir, encarar y barrer girando, y matar**,
   y penaliza disparar a la nada (cuidar municion).
 - `FrameStack`: apila 3 vectores para dar memoria de corto plazo (39 dims)."""))
-cells.append(code(code_of("src/policy/actions.py")))
 cells.append(code(code_of("src/env/doom_env.py")))
 cells.append(code(code_of("src/env/rl_env.py")))
 cells.append(code(code_of("src/env/frame_stack.py")))
 
 # ── 6. Politica: codigo ───────────────────────────────────────────────────────
 cells.append(md(
-"""## 6. Politica: Double DQN (Dueling + PER + n-step)
+"""## 7. Politica: Double DQN (Dueling + PER + n-step)
 
 - `QNetwork`: MLP Dueling (separa V(s) y A(s,a)).
 - `PrioritizedReplayBuffer`: muestrea las transiciones con mayor error TD.
@@ -217,7 +225,7 @@ cells.append(code(code_of("src/policy/rl_agent.py")))
 
 # ── 7. Entrenamiento RL ───────────────────────────────────────────────────────
 cells.append(md(
-"""## 7. Entrenamiento del agente
+"""## 8. Entrenamiento del agente
 
 Bucle de entrenamiento con n-step returns y evaluacion greedy periodica. Mascara
 **sin avanzar** (torreta). Ajusta `TIMESTEPS` segun el tiempo disponible (el limite de
@@ -305,7 +313,7 @@ plt.show(); print("Entrenamiento terminado. Mejor eval:", mejor)'''))
 
 # ── 8. Evaluacion / demo ──────────────────────────────────────────────────────
 cells.append(md(
-"""## 8. Evaluacion final
+"""## 9. Evaluacion final
 
 Cargamos el mejor modelo y corremos varios episodios greedy (politica aprendida, sin
 exploracion). Reportamos kills y supervivencia: las metricas que importan en la sala."""))
@@ -323,7 +331,7 @@ for e in range(5):
 ev_env.close()'''))
 
 cells.append(md(
-"""## 9. Conclusiones
+"""## 10. Conclusiones
 
 - La **percepcion YOLO** (entrenada con auto-etiquetado desde ViZDoom) entrega un estado
   semantico e interpretable, mas eficiente en muestras que aprender desde pixeles crudos.
