@@ -111,10 +111,9 @@ cells.append(md(
 """## 5. Detector YOLO (percepcion)
 
 El detector se entreno **en LOCAL** (no aqui), para ahorrar tiempo de GPU en Kaggle. Esta
-celda **carga los pesos ya entrenados** (`doom-v4`), que se adjuntan a este notebook como
-**Kaggle Dataset** (boton **Add Input** -> tu dataset con `best.pt`). El proceso completo de
-como se construyo se documenta justo despues, pero **esas celdas son de referencia y no se
-ejecutan**.
+celda **carga los pesos ya entrenados** (`doom-v4`) clonando el repositorio publico del
+proyecto. El proceso completo de como se construyo se documenta justo despues, pero **esas
+celdas son de referencia y no se ejecutan**.
 
 **Metodo (resumen):** ViZDoom expone un `labels_buffer` con la posicion y el nombre de cada
 objeto en pantalla. Capturamos frames de varios escenarios y sacamos las cajas ground-truth
@@ -123,12 +122,11 @@ sobre ese dataset in-domain. Resultado en local: mAP@0.5 ~0.91, deteccion de pin
 sala ~0.89."""))
 cells.append(code(
 '''from pathlib import Path
-import glob
-# Detector v4 entrenado en LOCAL, adjuntado a este notebook como Kaggle Dataset.
-# (boton "Add Input" -> selecciona tu dataset que contiene best.pt)
-cand = glob.glob("/kaggle/input/**/best.pt", recursive=True)
-assert cand, "Falta el detector: agrega best.pt como Kaggle Dataset con 'Add Input'."
-DETECTOR_WEIGHTS = Path(cand[0])
+# Detector v4 entrenado en LOCAL. El repo es publico: clonamos (shallow) solo para
+# traer los pesos ya entrenados. El codigo de como se entreno esta documentado abajo.
+!git clone -q --depth 1 https://github.com/josh0827/IA_Doom_agent.git _repo
+DETECTOR_WEIGHTS = Path("_repo/runs/doom-v4/weights/best.pt")
+assert DETECTOR_WEIGHTS.exists(), "No se encontro best.pt tras clonar el repo."
 print("detector v4 (entrenado en LOCAL):", DETECTOR_WEIGHTS,
       DETECTOR_WEIGHTS.stat().st_size // 1024, "KB")'''))
 
