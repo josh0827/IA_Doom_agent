@@ -42,7 +42,7 @@ def main(model_size: str = "s", epochs: int = 100):
         hsv_v=0.5,         # mas variacion de brillo — entornos oscuros de Doom
         device=0,          # GPU 0 (RTX) — cambiar a "cpu" si no hay GPU
         project=str(ROOT / "runs"),
-        name="doom-v3",
+        name="doom-v4",
         exist_ok=True,
     )
 

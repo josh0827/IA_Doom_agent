@@ -50,6 +50,14 @@ GOAL_REWARD       = 300.0  # completar el nivel: claramente mas que cualquier fa
 # asi que un recorrido completo aporta ~1280 * PROGRESS_PER_UNIT.
 PROGRESS_PER_UNIT = 0.2    # 1280 ud -> ~256 de progreso total (comparable a ~1.7 kills)
 
+# ── Reward de SALA ABIERTA (defend_the_center, torreta) ────────────────────────
+# Objetivo distinto: no hay chaleco/avance; hay que sobrevivir girando y matando
+# enemigos que llegan de todos lados, cuidando municion.
+SURVIVAL_BONUS = 0.1   # por paso vivo (en sala SI premiamos durar; sustituye LIVING_COST)
+AIM_REWARD     = 0.2   # enemigo centrado (encararlo) -> fomenta apuntar girando
+SCAN_REWARD    = 0.05  # girar cuando NO hay enemigo a la vista -> barrido izq-der
+GOAL_ROOM      = 50.0  # sobrevivir hasta el timeout (aguantar toda la ronda)
+
 # Confianza minima para que una deteccion cuente como "enemigo de combate" en la
 # recompensa. Mas estricta que el umbral del detector (0.40): evita que un falso
 # positivo marginal haga que disparar a la nada cobre SHOOT_REWARD en lugar de
@@ -63,6 +71,8 @@ _SHOOT_ACTIONS  = {Action.ATTACK, Action.FORWARD_ATTACK,
                    Action.STRAFE_LEFT_ATTACK, Action.STRAFE_RIGHT_ATTACK,
                    Action.TURN_LEFT_ATTACK, Action.TURN_RIGHT_ATTACK,
                    Action.BACKWARD_ATTACK}
+_TURN_ACTIONS   = {Action.TURN_LEFT, Action.TURN_RIGHT,
+                   Action.TURN_LEFT_ATTACK, Action.TURN_RIGHT_ATTACK}
 
 _MAX_DEPTH = 1000.0  # combate tipico ocurre a 200-800 unidades, mejor resolucion
 
@@ -79,6 +89,8 @@ class RLEnv:
     ):
         self.env = DoomEnv(scenario, window_visible=window_visible, skill=skill)
         self.detector = Detector(weights, conf=conf)
+        # Sala abierta (defend_the_center) usa reward de torreta; pasillo usa progreso+meta.
+        self._room = "defend" in Path(scenario).stem.lower()
         self.frame_skip = frame_skip
         self.state_dim = STATE_DIM
         self.n_actions = N_ACTIONS
@@ -119,51 +131,53 @@ class RLEnv:
             if info.get("dead"):
                 reward -= DEATH_PENALTY
             elif info.get("completed"):
-                reward += GOAL_REWARD   # llego al chaleco del final: objetivo logrado
+                reward += GOAL_ROOM if self._room else GOAL_REWARD
             self._last_overlay_data = None
             state = np.zeros(self.state_dim, dtype=np.float32)
             return state, reward, True, info
 
         vida, ammo, kills = info["vida"], info["ammo"], info["kills"]
-
-        # ── Progreso potencial: solo terreno NUEVO hacia el chaleco ────────────
-        pos_x = info.get("pos_x", 0.0)
-        if pos_x > self._max_x:
-            reward += PROGRESS_PER_UNIT * (pos_x - self._max_x)
-            self._max_x = pos_x
-
-        # ── Combate ───────────────────────────────────────────────────────────
         delta_kills  = max(0.0, kills - self._prev_kills)
         delta_health = vida - self._prev_health           # negativo si recibio danio
         took_damage  = 1.0 if delta_health < 0 else 0.0
 
-        reward += KILL_REWARD * delta_kills
-        reward += HEALTH_PENALTY * delta_health           # penaliza danio recibido
-        reward -= LIVING_COST                             # costo por paso (no merodear)
-
-        # ── Percepcion: hay enemigo a la vista? ───────────────────────────────
+        # ── Percepcion: enemigo a la vista (conf alta) y centrado? ─────────────
         result = self.detector.predict(frame)
         self._last_overlay_data = (frame, result)
-
-        enemy_present = False
+        centro_x = self._frame_w / 2
+        enemy_present = enemy_centered = False
         if result is not None and len(result.boxes) > 0:
             for box in result.boxes:
                 if (result.names[int(box.cls[0])] in ENEMIGOS
                         and float(box.conf[0]) >= COMBAT_CONF):
                     enemy_present = True
-                    break
+                    x1, _, x2, _ = box.xyxy[0].tolist()
+                    if abs((x1 + x2) / 2 - centro_x) < 0.15 * self._frame_w:
+                        enemy_centered = True
 
-        # Disparar CON enemigo visible: senal densa hacia el kill.
+        # ── Eventos comunes (pasillo y sala) ───────────────────────────────────
+        reward += KILL_REWARD * delta_kills
+        reward += HEALTH_PENALTY * delta_health            # penaliza danio recibido
         if enemy_present and action in _SHOOT_ACTIONS:
-            reward += SHOOT_REWARD
-
-        # Disparar SIN enemigo visible: penalizar (dispara a la nada).
+            reward += SHOOT_REWARD                          # disparar a blanco real
         if not enemy_present and action in _SHOOT_ACTIONS:
-            reward -= WASTE_SHOT_PENALTY
-
-        # Strafe con enemigo visible: comportamiento de evasion humano.
+            reward -= WASTE_SHOT_PENALTY                    # disparar a la nada
         if enemy_present and action in _STRAFE_ACTIONS:
-            reward += STRAFE_REWARD
+            reward += STRAFE_REWARD                         # esquivar
+
+        # ── Shaping especifico del modo ────────────────────────────────────────
+        if self._room:
+            reward += SURVIVAL_BONUS                        # sala: durar tiene valor
+            if enemy_present and enemy_centered:
+                reward += AIM_REWARD                        # encarar al enemigo
+            if not enemy_present and action in _TURN_ACTIONS:
+                reward += SCAN_REWARD                       # barrido buscando amenazas
+        else:
+            reward -= LIVING_COST                           # pasillo: no merodear
+            pos_x = info.get("pos_x", 0.0)                  # progreso potencial (X nueva)
+            if pos_x > self._max_x:
+                reward += PROGRESS_PER_UNIT * (pos_x - self._max_x)
+                self._max_x = pos_x
 
         self._steps_no_enemy = 0 if enemy_present else self._steps_no_enemy + 1
         self._prev_kills  = kills

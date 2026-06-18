@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import vizdoom as vzd
 
@@ -26,9 +27,11 @@ class DoomEnv:
         self.game.set_window_visible(window_visible)
         self.game.set_screen_format(vzd.ScreenFormat.RGB24)
         self.game.set_depth_buffer_enabled(True)
-        # Renderizado por GPU (OpenGL) en vez de software renderer por defecto.
-        # Acelera la generacion de frames, especialmente con depth buffer activo.
-        self.game.add_game_args("+vid_renderer opengl +gl_multisample 0")
+        # Renderizado por GPU (OpenGL): acelera frames con depth buffer activo.
+        # En servidores sin pantalla (Kaggle/Colab) OpenGL falla -> con DOOM_HEADLESS
+        # se omite y ViZDoom usa el software renderer headless.
+        if not os.environ.get("DOOM_HEADLESS"):
+            self.game.add_game_args("+vid_renderer opengl +gl_multisample 0")
         self.game.init()
         # POSITION_X disponible solo si el cfg lo declara (deadly_corridor): permite
         # medir avance real para la recompensa de progreso potencial.
