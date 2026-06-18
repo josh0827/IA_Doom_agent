@@ -15,6 +15,9 @@ runs/
 !runs/doom-v1/results.csv
 !runs/rl/dqn.pt
 !runs/rl/learning_curve.png
+# detector v4 (in-domain): versionado para clonar en Kaggle sin subir dataset.
+# Se fuerza con: git add -f runs/doom-v4/weights/best.pt
+!runs/doom-v4/weights/best.pt
 
 .ipynb_checkpoints/
 .streamlit/

@@ -56,12 +56,19 @@ class DQNAgent:
         frac = min(1.0, self.steps / self.eps_decay_steps)
         return self.eps_start + frac * (self.eps_end - self.eps_start)
 
-    def act(self, state: np.ndarray, greedy: bool = False) -> int:
+    def act(self, state: np.ndarray, greedy: bool = False, forbidden=None) -> int:
+        """forbidden: set de indices de accion prohibidos (p. ej. avanzar en sala)."""
+        allowed = ([a for a in range(self.n_actions) if a not in forbidden]
+                   if forbidden else None)
         if not greedy and np.random.rand() < self.epsilon():
-            return np.random.randint(self.n_actions)
+            return int(np.random.choice(allowed)) if allowed else np.random.randint(self.n_actions)
         with torch.no_grad():
             s = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-            return int(self.policy_net(s).argmax(dim=1).item())
+            q = self.policy_net(s).squeeze(0)
+            if forbidden:
+                for i in forbidden:
+                    q[i] = -1e9
+            return int(q.argmax().item())
 
     def learn(self) -> float | None:
         """Double DQN con PER: loss ponderada por importance sampling."""

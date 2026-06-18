@@ -99,7 +99,8 @@ def make_env(weights, scenario, frame_skip, skill, window_visible=False):
     )
 
 
-def evaluate(agent, weights, scenario, frame_skip, skill=1, n_ep=3, max_steps=600) -> tuple[float, float]:
+def evaluate(agent, weights, scenario, frame_skip, skill=1, n_ep=3, max_steps=600,
+             forbidden=None) -> tuple[float, float]:
     """Corre N episodios en modo greedy y devuelve (reward_medio, kills_medio)."""
     rewards, kills_list = [], []
     for _ in range(n_ep):
@@ -107,7 +108,7 @@ def evaluate(agent, weights, scenario, frame_skip, skill=1, n_ep=3, max_steps=60
         state = env.reset()
         total, ep_kills = 0.0, 0
         for _ in range(max_steps):
-            action = agent.act(state, greedy=True)
+            action = agent.act(state, greedy=True, forbidden=forbidden)
             state, reward, done, info = env.step(action)
             total += reward
             ep_kills = int(info.get("kills", 0))
@@ -148,7 +149,29 @@ def main():
     parser.add_argument("--resume",     action="store_true")
     parser.add_argument("--window",     action="store_true")
     parser.add_argument("--no-curriculum", action="store_true")
+    parser.add_argument("--scenario",   type=str, default="deadly_corridor",
+                        help="cfg en src/env/scenarios (sin .cfg)")
+    parser.add_argument("--no-forward", action="store_true",
+                        help="prohibe avanzar (entreno torreta para sala abierta)")
+    parser.add_argument("--tag",        type=str, default="",
+                        help="sufijo para no pisar pesos/curva (ej: _room)")
+    parser.add_argument("--timesteps",  type=int, default=0,
+                        help="presupuesto de pasos de entorno (0 = usar --episodes)")
     args = parser.parse_args()
+    if args.timesteps > 0:
+        args.episodes = 10**9   # corre hasta agotar el presupuesto de pasos
+
+    # Escenario, rutas de salida (por tag) y mascara de acciones.
+    global SCENARIO, CKPT, CKPT_LAST, CURVE, TB_DIR
+    SCENARIO  = ROOT / "src" / "env" / "scenarios" / f"{args.scenario}.cfg"
+    CKPT      = OUT_DIR / f"dqn{args.tag}.pt"
+    CKPT_LAST = OUT_DIR / f"dqn_last{args.tag}.pt"
+    CURVE     = OUT_DIR / f"learning_curve{args.tag}.png"
+    TB_DIR    = OUT_DIR / f"tb{args.tag}"
+    forbidden = ({int(Action.MOVE_FORWARD), int(Action.FORWARD_ATTACK)}
+                 if args.no_forward else None)
+    print(f"Escenario: {args.scenario} | tag='{args.tag}' | "
+          f"no_forward={args.no_forward} | curriculum={not args.no_curriculum}")
 
     # ── Verificacion GPU ──────────────────────────────────────────────────────
     if args.device == "cuda" and not torch.cuda.is_available():
@@ -195,6 +218,7 @@ def main():
     kills_rec  = deque(maxlen=20)
     mejor_eval = float("-inf")
     nstep_buf  = NStepBuffer(N_STEP, agent.gamma)
+    total_steps = 0   # pasos de entorno acumulados (para --timesteps)
 
     try:
         for ep in range(1, args.episodes + 1):
@@ -202,8 +226,9 @@ def main():
             total, losses, ep_kills = 0.0, [], 0
 
             for step in range(args.max_steps):
-                action = agent.act(state)
+                action = agent.act(state, forbidden=forbidden)
                 next_state, reward, done, info = env.step(action)
+                total_steps += 1
 
                 # n-step: acumula y empuja al buffer cuando hay N transiciones
                 transition = nstep_buf.push(state, action, reward, next_state, float(done))
@@ -244,8 +269,10 @@ def main():
             kills_media  = sum(kills_rec) / len(kills_rec)
             loss_str     = f"{sum(losses)/len(losses):.4f}" if losses else "  N/A  "
 
+            prog = (f"pasos {total_steps}/{args.timesteps}" if args.timesteps
+                    else f"Ep {ep:4d}/{args.episodes}")
             print(
-                f"Ep {ep:4d}/{args.episodes} | skill={curr_skill} | "
+                f"{prog} | skill={curr_skill} | "
                 f"reward={total:7.1f} | media20={media:7.1f} | "
                 f"kills={ep_kills} | kills_avg={kills_media:.1f} | "
                 f"eps={agent.epsilon():.3f} | loss={loss_str}"
@@ -271,7 +298,8 @@ def main():
 
             # Evaluacion greedy periodica
             if ep % 50 == 0:
-                eval_reward, eval_kills = evaluate(agent, weights, SCENARIO, args.frame_skip, skill=curr_skill)
+                eval_reward, eval_kills = evaluate(agent, weights, SCENARIO, args.frame_skip,
+                                                   skill=curr_skill, forbidden=forbidden)
                 print(f"  [EVAL] reward={eval_reward:.1f} | kills={eval_kills:.1f}")
                 if use_tb:
                     writer.add_scalar("Eval/reward", eval_reward, ep)
@@ -292,6 +320,11 @@ def main():
                     env.close()
                     env = make_env(weights, SCENARIO, args.frame_skip, curr_skill)
                     print(f"  [CURRICULUM] Subiendo a skill {curr_skill} (kills_avg={kills_media:.1f})")
+
+            # Presupuesto por pasos (--timesteps): corta al alcanzarlo
+            if args.timesteps and total_steps >= args.timesteps:
+                print(f"\nPresupuesto alcanzado: {total_steps} pasos en {ep} episodios.")
+                break
 
     except KeyboardInterrupt:
         print("\nEntrenamiento interrumpido.")
