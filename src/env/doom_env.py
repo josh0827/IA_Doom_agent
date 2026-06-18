@@ -30,7 +30,10 @@ class DoomEnv:
         # Acelera la generacion de frames, especialmente con depth buffer activo.
         self.game.add_game_args("+vid_renderer opengl +gl_multisample 0")
         self.game.init()
-        self._last_info = {"vida": 100, "ammo": 0, "kills": 0}
+        # POSITION_X disponible solo si el cfg lo declara (deadly_corridor): permite
+        # medir avance real para la recompensa de progreso potencial.
+        self._has_posx = vzd.GameVariable.POSITION_X in self.game.get_available_game_variables()
+        self._last_info = {"vida": 100, "ammo": 0, "kills": 0, "pos_x": 0.0}
         self._last_depth = None
 
     def reset(self):
@@ -49,6 +52,8 @@ class DoomEnv:
                 "vida":  self.game.get_game_variable(vzd.GameVariable.HEALTH),
                 "ammo":  self.game.get_game_variable(vzd.GameVariable.AMMO2),
                 "kills": self.game.get_game_variable(vzd.GameVariable.KILLCOUNT),
+                "pos_x": (self.game.get_game_variable(vzd.GameVariable.POSITION_X)
+                          if self._has_posx else 0.0),
             }
         # Al morir (state=None) devuelve el ultimo valor conocido para no perder kills.
         info = dict(self._last_info)

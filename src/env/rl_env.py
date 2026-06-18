@@ -9,12 +9,12 @@ Recompensa (shaping):
   + STRAFE_REWARD   bonus por esquivar (strafe) cuando hay enemigo a la vista
   - HEALTH_PENALTY  penaliza recibir danio (delta de vida negativo)
   - DEATH_PENALTY   castigo explicito por morir
-  + SURVIVAL_BONUS  premio minimo por cada paso vivo (incentiva no suicidarse)
-  + PROGRESS_SCALE  fraccion del reward nativo del escenario = avanzar hacia el
-                    chaleco del final del corredor (senal densa de progreso);
-                    incluye living_reward y death_penalty nativos.
+  - LIVING_COST     costo por paso: desincentiva merodear/farmear tiempo
+  + PROGRESS_PER_UNIT  progreso POTENCIAL: premia solo terreno NUEVO ganado hacia
+                    el chaleco (delta de la X maxima). NO es velocidad, asi que
+                    merodear no farmea reward. Acotado por el largo del corredor.
   + GOAL_REWARD     premio terminal por COMPLETAR el nivel (alcanzar el chaleco
-                    vivo, antes del timeout). Hace explicito "llegar al final".
+                    vivo, antes del timeout). Domina sobre cualquier farmeo.
 
 Espacio de accion: 13 acciones (incluye strafe y acciones combinadas).
   0 MOVE_FORWARD        5 STRAFE_LEFT          10 TURN_LEFT_ATTACK
@@ -36,14 +36,19 @@ from src.policy.rules import ENEMIGOS
 N_ACTIONS = 13
 
 KILL_REWARD       = 150.0
-SHOOT_REWARD      = 2.0   # disparar CON enemigo visible
-WASTE_SHOT_PENALTY = 1.5  # disparar SIN enemigo visible (se resta)
-STRAFE_REWARD     = 0.8   # esquivar con enemigo visible
+SHOOT_REWARD      = 2.0    # disparar CON enemigo visible
+WASTE_SHOT_PENALTY = 5.0   # disparar SIN enemigo visible (antes 1.5: rociaba paredes gratis)
+STRAFE_REWARD     = 0.8    # esquivar con enemigo visible
 HEALTH_PENALTY    = 0.8
-DEATH_PENALTY     = 50.0
-SURVIVAL_BONUS    = 0.02
-PROGRESS_SCALE    = 0.10   # peso del avance hacia el chaleco (antes 0.02: casi invisible)
-GOAL_REWARD       = 150.0  # completar el nivel (llegar al chaleco vivo) = tan valioso como un kill
+DEATH_PENALTY     = 100.0  # morir duele (antes 50: rushear-y-morir salia rentable)
+LIVING_COST       = 0.05   # costo por paso: desincentiva merodear/farmear tiempo
+GOAL_REWARD       = 300.0  # completar el nivel: claramente mas que cualquier farmeo
+
+# Progreso POTENCIAL: se premia solo el terreno NUEVO ganado hacia el chaleco
+# (delta de la X maxima alcanzada), NO la velocidad de movimiento. Asi merodear o
+# ir y venir NO acumula reward (no farmeable). Corredor mide ~1280 unidades en X,
+# asi que un recorrido completo aporta ~1280 * PROGRESS_PER_UNIT.
+PROGRESS_PER_UNIT = 0.2    # 1280 ud -> ~256 de progreso total (comparable a ~1.7 kills)
 
 # Confianza minima para que una deteccion cuente como "enemigo de combate" en la
 # recompensa. Mas estricta que el umbral del detector (0.40): evita que un falso
@@ -81,6 +86,7 @@ class RLEnv:
         self._prev_health = 100.0
         self._prev_kills  = 0.0
         self._steps_no_enemy = 0
+        self._max_x = 0.0    # X maxima alcanzada (progreso potencial, no farmeable)
         self._frame_w = 640  # se actualiza en reset
 
     def reset(self) -> np.ndarray:
@@ -88,6 +94,7 @@ class RLEnv:
         self._prev_health    = self.env._last_info["vida"]
         self._prev_kills     = self.env._last_info["kills"]
         self._steps_no_enemy = 0
+        self._max_x          = self.env._last_info.get("pos_x", 0.0)
         ammo = self.env._last_info["ammo"]
 
         if frame is not None:
@@ -104,8 +111,9 @@ class RLEnv:
         frame, reward_env, done, info = self.env.step(
             action_to_vizdoom(action), tics=self.frame_skip
         )
-        # Reward nativo del escenario (progreso + living + death), atenuado.
-        reward = PROGRESS_SCALE * float(reward_env)
+        # No usamos el reward nativo (premia velocidad => farmeable). Construimos
+        # el shaping desde cero con progreso potencial + eventos.
+        reward = 0.0
 
         if done or frame is None:
             if info.get("dead"):
@@ -118,6 +126,12 @@ class RLEnv:
 
         vida, ammo, kills = info["vida"], info["ammo"], info["kills"]
 
+        # ── Progreso potencial: solo terreno NUEVO hacia el chaleco ────────────
+        pos_x = info.get("pos_x", 0.0)
+        if pos_x > self._max_x:
+            reward += PROGRESS_PER_UNIT * (pos_x - self._max_x)
+            self._max_x = pos_x
+
         # ── Combate ───────────────────────────────────────────────────────────
         delta_kills  = max(0.0, kills - self._prev_kills)
         delta_health = vida - self._prev_health           # negativo si recibio danio
@@ -125,7 +139,7 @@ class RLEnv:
 
         reward += KILL_REWARD * delta_kills
         reward += HEALTH_PENALTY * delta_health           # penaliza danio recibido
-        reward += SURVIVAL_BONUS                          # sobrevivir tiene valor
+        reward -= LIVING_COST                             # costo por paso (no merodear)
 
         # ── Percepcion: hay enemigo a la vista? ───────────────────────────────
         result = self.detector.predict(frame)
