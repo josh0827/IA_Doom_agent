@@ -86,11 +86,14 @@ class RLEnv:
         conf: float = 0.40,  # ver nota en Detector: umbral alto contra falsos positivos
         window_visible: bool = False,
         skill: int | None = None,
+        cheats: bool = False,  # demo de sala: permite summon de enemigos detectables
     ):
-        self.env = DoomEnv(scenario, window_visible=window_visible, skill=skill)
+        self.env = DoomEnv(scenario, window_visible=window_visible, skill=skill, cheats=cheats)
         self.detector = Detector(weights, conf=conf)
-        # Sala abierta (defend_the_center) usa reward de torreta; pasillo usa progreso+meta.
-        self._room = "defend" in Path(scenario).stem.lower()
+        # Sala abierta (defend_the_center / arena de demo health_gathering) usa reward
+        # de torreta; pasillo usa progreso+meta.
+        _stem = Path(scenario).stem.lower()
+        self._room = "defend" in _stem or "health_gathering" in _stem
         self.frame_skip = frame_skip
         self.state_dim = STATE_DIM
         self.n_actions = N_ACTIONS
@@ -210,6 +213,10 @@ class RLEnv:
         cy = depth.shape[0] // 2
         dist = float(depth[cy, best_cx])
         return float(np.clip(dist / _MAX_DEPTH, 0.0, 1.0))
+
+    def send(self, command: str):
+        """Pasa un comando de consola al DoomEnv subyacente (demo de sala)."""
+        self.env.send(command)
 
     @property
     def last_overlay_data(self):

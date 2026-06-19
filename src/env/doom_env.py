@@ -4,9 +4,15 @@ import vizdoom as vzd
 
 
 class DoomEnv:
-    def __init__(self, scenario_cfg: Path, window_visible: bool = False, skill: int | None = None):
+    def __init__(self, scenario_cfg: Path, window_visible: bool = False, skill: int | None = None,
+                 cheats: bool = False):
         self.game = vzd.DoomGame()
         self.game.load_config(str(scenario_cfg))
+        # cheats: habilita la consola de ZDoom (god, give, summon) para la demo de
+        # sala controlada, donde spawneamos a mano solo enemigos detectables.
+        self._cheats = cheats
+        if cheats:
+            self.game.add_game_args("+sv_cheats 1")
         # Inyecta el .wad buscando en este orden:
         # 1. <scenarios_dir>/<stem>.wad  (escenarios de ViZDoom, e.g. deadly_corridor)
         # 2. <mismo directorio que el cfg>/<stem>.wad  (WADs propios, e.g. freedoom1)
@@ -69,6 +75,10 @@ class DoomEnv:
             and self.game.get_episode_time() < self.game.get_episode_timeout()
         )
         return frame, reward, done, info
+
+    def send(self, command: str):
+        """Envia un comando de consola de ZDoom (requiere cheats=True). Ej: 'summon Demon'."""
+        self.game.send_game_command(command)
 
     def _frame(self):
         state = self.game.get_state()

@@ -31,6 +31,16 @@ ESCENARIOS = {
         "curva": ROOT / "runs" / "rl" / "learning_curve_room.png",
         "torreta": True,
     },
+    # Demo controlada: arena cerrada (mapa health_gathering) donde spawneamos a
+    # mano SOLO enemigos de alta detectabilidad (pinky + zombieman). god + give
+    # all para una demostracion visual limpia de percepcion + disparo.
+    "Sala demo (solo pinky + zombieman)": {
+        "cfg":   ROOT / "src" / "env" / "scenarios" / "health_gathering.cfg",
+        "ckpt":  ROOT / "runs" / "rl" / "dqn_room.pt",
+        "curva": ROOT / "runs" / "rl" / "learning_curve_room.png",
+        "torreta": True,
+        "summon": ["Demon", "Zombieman"],
+    },
 }
 
 st.set_page_config(page_title="Agente Doom — YOLO + DQN", layout="wide")
@@ -69,6 +79,7 @@ SCENARIO  = ESC["cfg"]
 CKPT_RL   = ESC["ckpt"]
 CURVE_IMG = ESC["curva"]
 TORRETA   = ESC["torreta"]
+SUMMON    = ESC.get("summon")  # lista de enemigos a spawnear (None = escenario nativo)
 
 with st.sidebar:
     if CURVE_IMG.exists():
@@ -116,7 +127,8 @@ def run_dqn():
         st.error(f"Falta el modelo RL en {CKPT_RL}. Entrena con scripts/train_rl.py")
         return
 
-    env   = FrameStack(RLEnv(WEIGHTS, SCENARIO, frame_skip=2, conf=conf_yolo, window_visible=False), n_frames=3)
+    env   = FrameStack(RLEnv(WEIGHTS, SCENARIO, frame_skip=2, conf=conf_yolo,
+                             window_visible=False, cheats=bool(SUMMON)), n_frames=3)
     agent = DQNAgent(env.state_dim, env.n_actions)
     agent.load(CKPT_RL)
     # Modo torreta (sala): se prohibe avanzar enmascarando esas acciones.
@@ -125,9 +137,22 @@ def run_dqn():
     fps = FPSCounter()
     total_reward = 0.0
 
+    def poblar_arena(n=3):
+        """Spawnea enemigos detectables alrededor del jugador (demo controlada)."""
+        for actor in SUMMON:
+            for _ in range(n):
+                env.env.send(f"summon {actor}")
+
     try:
         state = env.reset()
+        if SUMMON:
+            env.env.send("god")       # ignora la lava del mapa de demo
+            env.env.send("give all")  # arma + municion garantizadas
+            poblar_arena(3)
         for step in range(max_steps):
+            # Re-poblar la arena para que la demo no se quede sin enemigos.
+            if SUMMON and step > 0 and step % 60 == 0:
+                poblar_arena(1)
             action = agent.act(state, greedy=True, forbidden=forbidden)
             state, reward, done, info = env.step(action)
             total_reward += reward
