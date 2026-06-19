@@ -143,16 +143,27 @@ def run_dqn():
             for _ in range(n):
                 env.env.send(f"summon {actor}")
 
+    def equipar():
+        """god + escopeta equipada (slot 3, el arma con que entreno la politica)
+        + municion. 'give all' NO autoselecciona arma: hay que forzar el slot."""
+        env.env.send("god")
+        env.env.send("give all")
+        env.env.send("slot 3")     # escopeta: arma de la politica de sala
+        env.env.send("give ammo")
+
     try:
         state = env.reset()
         if SUMMON:
-            env.env.send("god")       # ignora la lava del mapa de demo
-            env.env.send("give all")  # arma + municion garantizadas
-            poblar_arena(3)
+            equipar()
+            poblar_arena(4)
         for step in range(max_steps):
-            # Re-poblar la arena para que la demo no se quede sin enemigos.
-            if SUMMON and step > 0 and step % 60 == 0:
-                poblar_arena(1)
+            if SUMMON:
+                # Municion infinita: rellena seguido para que nunca se quede sin balas.
+                if step % 15 == 0:
+                    env.env.send("give ammo")
+                # Re-poblar la arena para que siempre haya enemigos a la vista.
+                if step > 0 and step % 45 == 0:
+                    poblar_arena(2)
             action = agent.act(state, greedy=True, forbidden=forbidden)
             state, reward, done, info = env.step(action)
             total_reward += reward
