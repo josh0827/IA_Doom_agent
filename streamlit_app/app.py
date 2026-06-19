@@ -137,11 +137,16 @@ def run_dqn():
     fps = FPSCounter()
     total_reward = 0.0
 
-    def poblar_arena(n=3):
-        """Spawnea enemigos detectables alrededor del jugador (demo controlada)."""
+    VIVOS_OBJETIVO = 4   # cuantos enemigos mantener en la arena (demo no saturada)
+    total_summon = 0     # acumulado spawneado (para estimar vivos = total - kills)
+
+    def poblar_arena(n=1):
+        """Spawnea n enemigos de cada tipo alrededor del jugador (demo controlada)."""
+        nonlocal total_summon
         for actor in SUMMON:
             for _ in range(n):
                 env.env.send(f"summon {actor}")
+        total_summon += n * len(SUMMON)
 
     def equipar():
         """god + todas las armas + municion. 'give all' NO autoselecciona arma,
@@ -156,7 +161,7 @@ def run_dqn():
         state = env.reset()
         if SUMMON:
             equipar()
-            poblar_arena(4)
+            poblar_arena(VIVOS_OBJETIVO // len(SUMMON))  # poblacion inicial
         for step in range(max_steps):
             if SUMMON:
                 # Forzar la escopeta en los primeros pasos (un 'slot 3' por tic):
@@ -166,12 +171,16 @@ def run_dqn():
                 # Municion infinita: rellena seguido para que nunca se quede sin balas.
                 if step % 15 == 0:
                     env.env.send("give ammo")
-                # Re-poblar la arena para que siempre haya enemigos a la vista.
-                if step > 0 and step % 45 == 0:
-                    poblar_arena(2)
             action = agent.act(state, greedy=True, forbidden=forbidden)
             state, reward, done, info = env.step(action)
             total_reward += reward
+
+            # Reponer solo cuando quedan pocos vivos (vivos ~= summoneados - kills),
+            # para que la arena no se sature de enemigos.
+            if SUMMON:
+                vivos = total_summon - int(info.get("kills", 0))
+                if vivos < VIVOS_OBJETIVO - 1:
+                    poblar_arena(1)
 
             data = env.last_overlay_data
             if data is not None:
