@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sustentación Proyecto Final - Agente Doom: Percepción YOLO + Double DQN</title>
+<style>
+  :root{
+    --ink:#101828;
+    --ink-soft:#475467;
+    --ink-faint:#98a2b3;
+    --accent:#0f6f8f;
+    --accent-deep:#0b4f66;
+    --accent-soft:#e8f2f6;
+    --gold:#b08d3e;
+    --line:#e4e7ec;
+    --bg-soft:#f8fafb;
+    --ok:#0e7c4a;
+    --warn:#b54708;
+    --code:#0b4f66;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{background:#d9dde3;}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .page{
+    width:210mm;
+    height:296mm;
+    background:#ffffff;
+    margin:8mm auto;
+    padding:16mm 17mm 14mm;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 2px 14px rgba(16,24,40,.18);
+    display:flex;
+    flex-direction:column;
+  }
+  @page{size:A4;margin:0;}
+  @media print{
+    html,body{background:#fff;}
+    .page{margin:0;box-shadow:none;page-break-after:always;}
+    .page:last-child{page-break-after:auto;}
+  }
+
+  /* ---------- tipografía base ---------- */
+  .kicker{font-size:8.2pt;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:26pt;line-height:1.14;font-weight:400;margin:5mm 0 4mm;}
+  h2{font-family:Georgia,"Times New Roman",serif;font-size:16pt;font-weight:400;line-height:1.2;margin:0 0 1.5mm;}
+  h3{font-size:9.5pt;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-deep);font-weight:700;margin-bottom:2.5mm;}
+  p{font-size:9.6pt;line-height:1.52;color:var(--ink-soft);}
+  strong{color:var(--ink);font-weight:600;}
+  .lead{font-size:10.5pt;color:var(--ink-soft);line-height:1.55;}
+
+  /* ---------- cabecera y pie ---------- */
+  .pagehead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.6px solid var(--ink);padding-bottom:2.5mm;margin-bottom:6mm;}
+  .pagehead .left{font-size:8pt;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--ink);}
+  .pagehead .right{font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);}
+  .pagefoot{margin-top:auto;display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:2.5mm;font-size:7.6pt;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+
+  /* ---------- componentes ---------- */
+  .rule{height:1px;background:var(--line);margin:5mm 0;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6mm;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4mm;}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:4mm;}
+
+  .stat{border-top:2px solid var(--accent);padding-top:2.2mm;}
+  .stat .num{font-family:Georgia,serif;font-size:17pt;color:var(--ink);line-height:1.05;}
+  .stat .lbl{font-size:7.8pt;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-top:1mm;line-height:1.35;}
+
+  .card{background:var(--bg-soft);border:1px solid var(--line);border-radius:2.5mm;padding:4.5mm 5mm;}
+  .card.accent{background:var(--accent-soft);border-color:#cfe3ea;}
+  .card h4{font-size:9.3pt;font-weight:700;color:var(--ink);margin-bottom:1.5mm;}
+  .card p{font-size:8.8pt;line-height:1.5;}
+
+  .numbered{counter-reset:step;}
+  .step{display:flex;gap:4mm;margin-bottom:4mm;align-items:flex-start;}
+  .step .n{counter-increment:step;flex:0 0 7.5mm;height:7.5mm;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:10.5pt;}
+  .step .n::before{content:counter(step);}
+  .step h4{font-size:10pt;font-weight:700;margin-bottom:.8mm;}
+  .step p{font-size:9.2pt;}
+
+  table{width:100%;border-collapse:collapse;font-size:9pt;}
+  th{text-align:left;font-size:7.8pt;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;padding:2mm 2.5mm;border-bottom:1.4px solid var(--ink);}
+  td{padding:2.2mm 2.5mm;border-bottom:1px solid var(--line);color:var(--ink-soft);vertical-align:top;line-height:1.4;}
+  td.k{color:var(--ink);font-weight:600;white-space:nowrap;}
+  td.num{font-family:Georgia,serif;font-size:10.5pt;color:var(--ink);white-space:nowrap;}
+  tr.hl td{background:var(--accent-soft);}
+  .tag{display:inline-block;font-size:7.4pt;font-weight:700;letter-spacing:.06em;padding:.8mm 2.2mm;border-radius:99px;text-transform:uppercase;}
+  .tag.best{background:#e6f4ec;color:var(--ok);}
+  .tag.fail{background:#fdf0e4;color:var(--warn);}
+  .tag.base{background:#eef1f4;color:var(--ink-soft);}
+
+  .quote{border-left:2.5px solid var(--gold);padding:1mm 0 1mm 4.5mm;margin:4mm 0;}
+  .quote p{font-family:Georgia,serif;font-size:11pt;color:var(--ink);line-height:1.5;font-style:italic;}
+
+  code,.mono{font-family:Consolas,"Courier New",monospace;font-size:8.6pt;color:var(--code);background:var(--accent-soft);padding:.3mm 1.6mm;border-radius:1mm;}
+
+  ul.clean{list-style:none;}
+  ul.clean li{font-size:9.3pt;color:var(--ink-soft);line-height:1.5;padding-left:5mm;position:relative;margin-bottom:2.2mm;}
+  ul.clean li::before{content:"";position:absolute;left:0;top:2.1mm;width:2.2mm;height:2.2mm;background:var(--accent);border-radius:.5mm;}
+
+  /* ---------- ecuaciones ---------- */
+  .eq{
+    font-family:"Cambria Math",Georgia,"Times New Roman",serif;
+    background:#fbfcfd;border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:2mm;padding:3.6mm 5mm;margin:3mm 0;
+    font-size:11.5pt;color:var(--ink);text-align:center;line-height:1.7;
+  }
+  .eq .lbl{float:right;font-family:"Segoe UI",sans-serif;font-size:8pt;color:var(--ink-faint);font-style:normal;}
+  .eq i{font-style:italic;}
+  .eq .op{color:var(--accent-deep);}
+  .eqnote{font-size:8.4pt;color:var(--ink-faint);line-height:1.45;margin-top:1mm;}
+  sub,sup{font-size:.72em;}
+
+  /* ---------- figuras ---------- */
+  figure{margin:3mm 0;}
+  figure img{width:100%;border:1px solid var(--line);border-radius:2mm;display:block;}
+  figcaption{font-size:8pt;color:var(--ink-faint);margin-top:1.5mm;line-height:1.4;}
+  .figrow{display:grid;grid-template-columns:1fr 1fr;gap:4mm;}
+
+  /* ---------- portada ---------- */
+  .cover{justify-content:flex-start;}
+  .cover .band{background:var(--ink);color:#fff;margin:-16mm -17mm 0;padding:13mm 17mm 11mm;}
+  .cover .band .kicker{color:#7fc2d6;}
+  .cover .band h1{color:#fff;font-size:28pt;margin:4mm 0 3mm;}
+  .cover .band .sub{font-size:10.5pt;color:#c6cdd8;line-height:1.5;max-width:155mm;}
+  .scorebox{display:flex;gap:8mm;align-items:stretch;margin-top:9mm;}
+  .scorebox .big{flex:0 0 64mm;background:var(--accent-soft);border:1px solid #cfe3ea;border-radius:3mm;padding:7mm 7mm 6mm;text-align:left;}
+  .scorebox .big .num{font-family:Georgia,serif;font-size:38pt;color:var(--accent-deep);line-height:1;}
+  .scorebox .big .lbl{font-size:8pt;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-deep);margin-top:2mm;font-weight:700;}
+  .meta{font-size:9.4pt;color:var(--ink-soft);line-height:1.85;}
+  .meta b{color:var(--ink);font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- ==================== PÁGINA 1 · PORTADA ==================== -->
+<section class="page cover">
+  <div class="band">
+    <div class="kicker">Universidad Nacional de Colombia · Sede Manizales · Teoría del Aprendizaje de Máquinas</div>
+    <h1>Agente Doom: percepción YOLO acoplada a un agente Double DQN</h1>
+    <div class="sub">Sustentación del proyecto final. Un agente que juega Doom (ViZDoom) combinando un detector de objetos YOLOv8 como módulo de percepción con una política de aprendizaje por refuerzo Double DQN (Dueling + Prioritized Replay + n-step). Entrenado y evaluado en dos escenarios: el pasillo <span style="color:#fff">deadly_corridor</span> y la sala abierta <span style="color:#fff">defend_the_center</span>.</div>
+  </div>
+
+  <div class="scorebox">
+    <div class="big">
+      <div class="num">0.908</div>
+      <div class="lbl">mAP@0.5 del detector<br>(percepción, validación)</div>
+      <p style="font-size:8.6pt;margin-top:2.5mm;">Detector entrenado sobre un dataset in-domain auto-etiquetado desde el propio motor, sin anotación manual.</p>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+      <div class="meta">
+        <b>Equipo:</b> Los Controladores<br>
+        <b>Estudiantes:</b> Joshua Marín Castrillón (entorno + política) · David Henao Rojas (percepción)<br>
+        <b>Profesor:</b> Diego Pérez Rosero<br>
+        <b>Fecha:</b> Junio de 2026
+      </div>
+    </div>
+  </div>
+
+  <div class="rule" style="margin-top:9mm;"></div>
+
+  <h3>Solución en una línea</h3>
+  <p class="lead">Cada frame del juego pasa por un <strong>detector YOLOv8</strong> que lo convierte en un vector semántico de 13 variables (hay enemigo, a qué lado, qué tan cerca, vida, munición). Tres frames se apilan en un estado de 39 dimensiones que alimenta una red <strong>Double DQN con arquitectura Dueling</strong>, entrenada con Prioritized Experience Replay y retornos n-step bajo una función de recompensa diseñada según el escenario.</p>
+
+  <div class="grid4" style="margin-top:7mm;">
+    <div class="stat"><div class="num">39</div><div class="lbl">Dimensiones del<br>estado (13 × 3 frames)</div></div>
+    <div class="stat"><div class="num">13</div><div class="lbl">Acciones discretas<br>(mover, girar, disparar)</div></div>
+    <div class="stat"><div class="num">4</div><div class="lbl">Técnicas sobre el DQN<br>base (Double, Dueling, PER, n-step)</div></div>
+    <div class="stat"><div class="num">2</div><div class="lbl">Escenarios: pasillo<br>y sala abierta</div></div>
+  </div>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 1 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 2 · PROBLEMA Y ARQUITECTURA ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">01 · El problema y la arquitectura</span><span class="right">Percepción + Política</span></div>
+
+  <h2>Jugar Doom es un problema de decisión secuencial bajo observación parcial</h2>
+  <p class="lead" style="margin-bottom:5mm;">El agente no ve el mapa completo: solo el frame que tiene enfrente. En cada instante debe decidir una acción (girar, avanzar, disparar) para maximizar una recompensa a futuro (matar enemigos, sobrevivir, llegar a la meta). Esto es un <strong>Proceso de Decisión de Markov parcialmente observable</strong>. La dificultad de aprender directamente desde píxeles motiva la decisión central del diseño: <strong>separar percepción de control</strong>.</p>
+
+  <div class="grid2" style="margin-bottom:5mm;">
+    <div class="card accent">
+      <h4>Por qué no aprender desde píxeles crudos</h4>
+      <p>Un DQN sobre imágenes (240×320×3) debe aprender a la vez a "ver" y a "decidir". Eso exige millones de frames y una CNN profunda. Bajo cuota de GPU es inviable iterar.</p>
+    </div>
+    <div class="card">
+      <h4>Nuestra alternativa: percepción explícita</h4>
+      <p>YOLO traduce el frame a un estado semántico de baja dimensión. El agente RL aprende solo el control sobre 39 números interpretables, no sobre 230.400 píxeles. Mucho más eficiente en muestras.</p>
+    </div>
+  </div>
+
+  <h3>Pipeline completo de inferencia (un paso de juego)</h3>
+  <svg viewBox="0 0 760 150" style="width:100%;margin:3mm 0 4mm;" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#475467"/>
+      </marker>
+    </defs>
+    <rect x="4" y="50" width="104" height="56" rx="7" fill="#101828"/>
+    <text x="56" y="74" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="600">ViZDoom</text>
+    <text x="56" y="91" text-anchor="middle" fill="#9aa4b2" font-size="10">frame RGB</text>
+
+    <path d="M108 78 L 142 78" stroke="#475467" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <rect x="144" y="46" width="120" height="64" rx="7" fill="#e8f2f6" stroke="#cfe3ea"/>
+    <text x="204" y="70" text-anchor="middle" fill="#0b4f66" font-size="11.5" font-weight="700">YOLOv8</text>
+    <text x="204" y="86" text-anchor="middle" fill="#0f6f8f" font-size="9.5">detector · cajas</text>
+    <text x="204" y="99" text-anchor="middle" fill="#0f6f8f" font-size="9.5">+ depth buffer</text>
+
+    <path d="M264 78 L 298 78" stroke="#475467" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <rect x="300" y="46" width="120" height="64" rx="7" fill="#fff" stroke="#101828" stroke-width="1.4"/>
+    <text x="360" y="68" text-anchor="middle" fill="#101828" font-size="11.5" font-weight="700">Features</text>
+    <text x="360" y="84" text-anchor="middle" fill="#475467" font-size="9.5">vector ∈ ℝ¹³</text>
+    <text x="360" y="97" text-anchor="middle" fill="#475467" font-size="9.5">normalizado</text>
+
+    <path d="M420 78 L 454 78" stroke="#475467" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <rect x="456" y="46" width="120" height="64" rx="7" fill="#e8f2f6" stroke="#cfe3ea"/>
+    <text x="516" y="68" text-anchor="middle" fill="#0b4f66" font-size="11.5" font-weight="700">FrameStack</text>
+    <text x="516" y="84" text-anchor="middle" fill="#0f6f8f" font-size="9.5">apila 3 → ℝ³⁹</text>
+    <text x="516" y="97" text-anchor="middle" fill="#0f6f8f" font-size="9.5">memoria corta</text>
+
+    <path d="M576 78 L 610 78" stroke="#475467" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <rect x="612" y="46" width="120" height="64" rx="7" fill="#0b4f66"/>
+    <text x="672" y="70" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="700">Double DQN</text>
+    <text x="672" y="86" text-anchor="middle" fill="#9fc8d6" font-size="9.5">elige acción</text>
+    <text x="672" y="99" text-anchor="middle" fill="#9fc8d6" font-size="9.5">a ∈ {0..12}</text>
+
+    <path d="M672 110 C 672 138 56 138 56 110" stroke="#98a2b3" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+    <text x="364" y="135" text-anchor="middle" fill="#98a2b3" font-size="9" font-style="italic">la acción se ejecuta en ViZDoom y se observa la recompensa r y el siguiente frame</text>
+  </svg>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>Percepción (David)</h4>
+      <p>Detector YOLOv8s entrenado en dominio. Provee, por frame: clase y caja de cada enemigo, y vía el <span class="mono">depth buffer</span> de ViZDoom, la distancia. Es el "sistema visual" del agente.</p>
+    </div>
+    <div class="card">
+      <h4>Entorno y política (Joshua)</h4>
+      <p>El wrapper RL construye el estado, define la recompensa según el escenario y entrena el agente Double DQN. Es el "sistema de decisión": qué hacer con lo que se ve.</p>
+    </div>
+  </div>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 2 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 3 · PERCEPCIÓN ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">02 · Percepción</span><span class="right">YOLO + auto-etiquetado in-domain</span></div>
+
+  <h2>De píxeles a un estado semántico de 13 variables</h2>
+  <p class="lead" style="margin-bottom:4mm;">El detector no se entrenó con datos genéricos de internet sino con imágenes del <strong>propio motor del juego</strong>, lo que elimina la brecha de dominio que hacía "alucinar" enemigos en las paredes. La clave: ViZDoom expone un <span class="mono">labels_buffer</span> con la posición y el nombre exactos de cada objeto en pantalla, lo que permite generar las cajas ground-truth automáticamente.</p>
+
+  <figure>
+    <img src="img/deteccion.jpg" alt="Detecciones de YOLO sobre frames de validación">
+    <figcaption>Detector YOLOv8 sobre frames de validación: cada caja es un enemigo localizado con su clase y confianza (aquí, <i>cacodemon</i>). Estas cajas son la materia prima del vector de estado.</figcaption>
+  </figure>
+
+  <div class="numbered" style="margin-top:4mm;">
+    <div class="step">
+      <div class="n"></div>
+      <div>
+        <h4>Captura + auto-etiquetado desde el motor</h4>
+        <p>Se recorren cuatro escenarios (<span class="mono">basic</span>, <span class="mono">deadly_corridor</span>, <span class="mono">defend_the_center</span>, <span class="mono">freedoom</span>) con acciones aleatorias. Por cada frame, el <span class="mono">labels_buffer</span> entrega las cajas reales. Se conserva un 20% de frames vacíos como fondo para enseñar a no detectar nada cuando no hay nada.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n"></div>
+      <div>
+        <h4>Entrenamiento del detector (YOLOv8s, 100 épocas, 640 px)</h4>
+        <p>2.213 imágenes etiquetadas (1.817 entrenamiento, 396 validación). El resultado es el modelo <span class="mono">doom-v4</span>, que se versiona en el repositorio para reproducir el pipeline sin re-etiquetar.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="n"></div>
+      <div>
+        <h4>Proyección a 13 features normalizadas</h4>
+        <p>Las cajas más vida y munición se comprimen en el vector de estado. Solo se confía en las 4 clases que el detector reconoce de forma fiable: <span class="mono">zombieman, imp, pinky, shotgun-guy</span>.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:2mm;">El vector de estado (13 dimensiones)</h3>
+  <div class="grid2">
+    <ul class="clean">
+      <li><strong>0–3</strong> presencia de enemigo, offset horizontal del más centrado, tamaño relativo del mayor, número de enemigos.</li>
+      <li><strong>4–5</strong> enemigo a la izquierda / a la derecha (one-hot del lado).</li>
+      <li><strong>6–7</strong> vida y munición normalizadas.</li>
+    </ul>
+    <ul class="clean">
+      <li><strong>8</strong> pasos sin ver enemigo (urgencia de explorar).</li>
+      <li><strong>9</strong> recibió daño en el último paso.</li>
+      <li><strong>10–11</strong> enemigo centrado (listo para disparar) y amenaza inminente (tamaño si hay enemigo).</li>
+      <li><strong>12</strong> distancia normalizada al enemigo, leída del <span class="mono">depth buffer</span>.</li>
+    </ul>
+  </div>
+
+  <div class="quote">
+    <p>Cada feature está en un rango acotado y tiene un significado físico claro. Eso hace que la política sea interpretable: se puede leer por qué el agente decidió girar o disparar.</p>
+  </div>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 3 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 4 · RESULTADOS DEL DETECTOR ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">03 · Validación de la percepción</span><span class="right">Métricas del detector doom-v4</span></div>
+
+  <h2>Un detector fiable es condición necesaria para la política</h2>
+  <p class="lead" style="margin-bottom:5mm;">Si la percepción alucina, el agente aprende a reaccionar a fantasmas. Por eso se validó el detector antes de entrenar la política, y se restringió la recompensa a las clases realmente confiables.</p>
+
+  <div class="grid4" style="margin-bottom:6mm;">
+    <div class="stat"><div class="num">0.930</div><div class="lbl">Precisión<br>(validación)</div></div>
+    <div class="stat"><div class="num">0.783</div><div class="lbl">Recall<br>(validación)</div></div>
+    <div class="stat"><div class="num">0.908</div><div class="lbl">mAP@0.5</div></div>
+    <div class="stat"><div class="num">0.779</div><div class="lbl">mAP@0.5:0.95</div></div>
+  </div>
+
+  <div class="figrow">
+    <figure>
+      <img src="img/detector_curvas.png" alt="Curvas de entrenamiento del detector">
+      <figcaption>Curvas de entrenamiento (100 épocas): las pérdidas de caja, clase y DFL bajan de forma estable y el mAP se asienta sobre 0.90 sin sobreajuste evidente.</figcaption>
+    </figure>
+    <figure>
+      <img src="img/confusion.png" alt="Matriz de confusión normalizada">
+      <figcaption>Matriz de confusión normalizada. Diagonal fuerte en las clases usadas: <i>pinky</i> 0.96, <i>shotgun-guy</i> 0.92, <i>zombieman</i> 0.83.</figcaption>
+    </figure>
+  </div>
+
+  <h3 style="margin-top:5mm;">Lectura honesta de la matriz: por qué solo 4 clases</h3>
+  <p style="margin-bottom:3mm;">La matriz revela el límite real del detector y justifica una decisión de diseño:</p>
+  <ul class="clean">
+    <li><strong>Clases fiables:</strong> <i>pinky</i>, <i>shotgun-guy</i> y <i>zombieman</i> se reconocen con acierto alto (0.83–0.96). Son las que aparecen en los escenarios jugados y las únicas que cuentan para la recompensa.</li>
+    <li><strong>Clases descartadas:</strong> <i>cacodemon</i> se confunde con fondo un 36% del tiempo, y varias clases (<i>baron-of-hell</i>, <i>cyberdemon</i>, <i>imp</i>, <i>lost-soul</i>, <i>spiderdemon</i>) no tienen muestras de validación suficientes. Incluirlas solo sumaría falsos positivos.</li>
+    <li><strong>Salvaguarda en la recompensa:</strong> aun con un detector bueno, para que una detección "cuente" como enemigo de combate se exige una confianza de <span class="mono">0.50</span>, más estricta que el umbral del detector (0.40). Es el dial que evita que el agente cobre recompensa por dispararle a un falso positivo.</li>
+  </ul>
+
+  <div class="quote">
+    <p>La decisión de confiar solo en cuatro clases no es una limitación oculta: es el resultado de leer la matriz de confusión y preferir una percepción estrecha pero fiable a una amplia pero ruidosa.</p>
+  </div>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 4 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 5 · MATEMÁTICA RL (NÚCLEO) ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">04 · Formulación matemática</span><span class="right">Double DQN + Dueling + n-step</span></div>
+
+  <h2>El corazón del agente: aproximar la función Q óptima</h2>
+  <p class="lead" style="margin-bottom:4mm;">El objetivo del agente es encontrar una política que maximice el retorno descontado. El valor de tomar la acción <i>a</i> en el estado <i>s</i> y luego actuar de forma óptima se llama función de acción-valor <i>Q*</i>, y satisface la ecuación de Bellman:</p>
+
+  <div class="eq">
+    <span class="lbl">Bellman óptima</span>
+    <i>Q</i>*(<i>s</i>,<i>a</i>) = 𝔼<sub>s′</sub>[ <i>r</i> + <i>γ</i> <span class="op">max</span><sub>a′</sub> <i>Q</i>*(<i>s′</i>,<i>a′</i>) ]
+  </div>
+  <p class="eqnote">Con factor de descuento <span class="mono">γ = 0.99</span>: el agente valora el futuro casi tanto como el presente, necesario porque las recompensas (kills, llegar a la meta) llegan con retraso respecto a las acciones que las causaron.</p>
+
+  <h3 style="margin-top:5mm;">1. Aproximación con red neuronal y objetivo Double DQN</h3>
+  <p style="margin-bottom:2mm;">Como el espacio de estados es continuo, se aproxima <i>Q</i> con una red de parámetros <i>θ</i>. El DQN estándar sobreestima los valores porque usa el mismo <span class="op">max</span> para elegir y evaluar. <strong>Double DQN</strong> lo corrige: una red (<i>θ</i>) <strong>elige</strong> la mejor acción y la red objetivo (<i>θ⁻</i>) la <strong>evalúa</strong>.</p>
+
+  <div class="eq">
+    <span class="lbl">objetivo n-step Double DQN</span>
+    <i>y</i> = <span style="font-size:1.25em;">∑</span><sub>k=0</sub><sup>N−1</sup> <i>γ</i><sup>k</sup> <i>r</i><sub>t+k</sub> &nbsp;+&nbsp; <i>γ</i><sup>N</sup> <i>Q</i>(<i>s</i><sub>t+N</sub>, <span class="op">argmax</span><sub>a′</sub> <i>Q</i>(<i>s</i><sub>t+N</sub>,<i>a′</i>; <i>θ</i>); <i>θ⁻</i>) · (1 − <i>d</i>)
+  </div>
+  <p class="eqnote">El primer término acumula las recompensas reales de <span class="mono">N = 3</span> pasos (retorno n-step): da crédito más preciso a secuencias de acciones, en vez de propagar de a un paso. El segundo término es el "bootstrap": el valor estimado del estado a <i>N</i> pasos, descontado por <i>γ</i><sup>N</sup>. El factor (1 − <i>d</i>) anula el bootstrap si el episodio terminó (<i>d</i> = 1).</p>
+
+  <h3 style="margin-top:5mm;">2. Arquitectura Dueling</h3>
+  <p style="margin-bottom:2mm;">La red no estima <i>Q</i> directamente, sino que la descompone en el <strong>valor del estado</strong> <i>V</i>(<i>s</i>) (qué tan bueno es estar aquí) y la <strong>ventaja</strong> <i>A</i>(<i>s</i>,<i>a</i>) (cuánto mejor es cada acción frente al promedio):</p>
+
+  <div class="eq">
+    <span class="lbl">Dueling</span>
+    <i>Q</i>(<i>s</i>,<i>a</i>) = <i>V</i>(<i>s</i>) + <span style="white-space:nowrap;">( <i>A</i>(<i>s</i>,<i>a</i>) − <span style="font-size:1.05em;">(1/|𝒜|)</span> <span style="font-size:1.15em;">∑</span><sub>a′</sub> <i>A</i>(<i>s</i>,<i>a′</i>) )</span>
+  </div>
+  <p class="eqnote">Restar la media de la ventaja resuelve la ambigüedad de identificabilidad (sin ella, sumar una constante a <i>V</i> y restarla a <i>A</i> daría la misma <i>Q</i>). La ganancia práctica: el agente actualiza <i>V</i>(<i>s</i>) en cada paso aunque no haya probado todas las acciones, así aprende más rápido qué estados son peligrosos.</p>
+
+  <h3 style="margin-top:5mm;">3. El error que se minimiza</h3>
+  <p style="margin-bottom:2mm;">El aprendizaje empuja la predicción hacia el objetivo. El residuo es el error de diferencia temporal (TD):</p>
+  <div class="eq">
+    <span class="lbl">TD-error</span>
+    <i>δ</i><sub>t</sub> = <i>y</i> − <i>Q</i>(<i>s</i><sub>t</sub>, <i>a</i><sub>t</sub>; <i>θ</i>)
+  </div>
+  <p class="eqnote">Este <i>δ</i> cumple doble papel: define la pérdida (página siguiente) y, en valor absoluto, mide qué tan "sorprendente" fue una transición, lo que el Prioritized Replay aprovecha para muestrear.</p>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 5 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 6 · PER, LOSS, EXPLORACIÓN ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">05 · Aprendizaje y exploración</span><span class="right">PER · Huber · ε-greedy</span></div>
+
+  <h2>Cómo aprende, de qué muestras y cómo explora</h2>
+
+  <h3>4. Prioritized Experience Replay (PER)</h3>
+  <p style="margin-bottom:2mm;">En vez de muestrear el buffer de forma uniforme, se priorizan las transiciones con mayor TD-error (de las que más hay que aprender). La prioridad y la probabilidad de muestreo son:</p>
+  <div class="eq">
+    <span class="lbl">prioridad y muestreo</span>
+    <i>p</i><sub>i</sub> = |<i>δ</i><sub>i</sub>| + <i>ε</i> &nbsp;&nbsp;,&nbsp;&nbsp; <i>P</i>(<i>i</i>) = <i>p</i><sub>i</sub><sup>α</sup> / <span style="font-size:1.1em;">∑</span><sub>k</sub> <i>p</i><sub>k</sub><sup>α</sup>
+  </div>
+  <p class="eqnote">Con <span class="mono">α = 0.6</span>: interpola entre muestreo uniforme (α=0) y puramente proporcional a la prioridad (α=1). El muestreo proporcional es O(log N) gracias a un árbol de sumas (<i>SumTree</i>).</p>
+
+  <p style="margin:3mm 0 2mm;">Priorizar introduce un sesgo: las transiciones "difíciles" aparecen más de lo que deberían. Se corrige con pesos de muestreo por importancia (IS):</p>
+  <div class="eq">
+    <span class="lbl">corrección de sesgo (IS)</span>
+    <i>w</i><sub>i</sub> = <span style="white-space:nowrap;">( 1 / (<i>N</i> · <i>P</i>(<i>i</i>)) )<sup>β</sup></span> &nbsp;/&nbsp; <span class="op">max</span><sub>j</sub> <i>w</i><sub>j</sub>
+  </div>
+  <p class="eqnote">El exponente <span class="mono">β</span> sube de 0.4 a 1.0 a lo largo del entrenamiento (annealing): la corrección importa más al final, cuando la política ya casi convergió. Se normaliza por el máximo para que los pesos solo reduzcan, nunca amplifiquen, el tamaño del paso.</p>
+
+  <h3 style="margin-top:4mm;">5. Función de pérdida</h3>
+  <p style="margin-bottom:2mm;">La pérdida es el error de Huber (suave: cuadrático cerca de cero, lineal lejos, robusto a outliers), ponderado por los pesos IS y promediado en el lote de tamaño <span class="mono">B = 512</span>:</p>
+  <div class="eq">
+    <span class="lbl">pérdida ponderada</span>
+    <i>L</i>(<i>θ</i>) = <span style="font-size:1.05em;">(1/B)</span> <span style="font-size:1.15em;">∑</span><sub>i</sub> <i>w</i><sub>i</sub> · <span class="op">Huber</span>( <i>δ</i><sub>i</sub> )
+  </div>
+  <p class="eqnote">Optimizada con Adam (<span class="mono">lr = 5×10⁻⁴</span> con recocido coseno) y recorte de gradiente a norma 10. La red objetivo <i>θ⁻</i> se sincroniza con <i>θ</i> cada 2.000 pasos, lo que estabiliza el objetivo móvil.</p>
+
+  <h3 style="margin-top:4mm;">6. Exploración: ε-greedy decreciente</h3>
+  <p style="margin-bottom:2mm;">El agente explora al azar con probabilidad <i>ε</i> y explota su política en otro caso. <i>ε</i> decae linealmente de exploración total a casi pura explotación:</p>
+  <div class="eq">
+    <span class="lbl">ε-greedy</span>
+    <i>ε</i>(<i>t</i>) = <i>ε</i><sub>0</sub> + <span class="op">min</span>(1, <i>t</i>/<i>T</i>) · (<i>ε</i><sub>f</sub> − <i>ε</i><sub>0</sub>) &nbsp;&nbsp; <span style="font-size:.8em;color:#98a2b3;">[ 1.0 → 0.05 en T = 50.000 pasos ]</span>
+  </div>
+  <p class="eqnote">Además, en la sala se enmascaran las acciones de avanzar: sus valores <i>Q</i> se fijan a −∞ antes del <span class="op">argmax</span>, forzando un comportamiento de torreta sin necesidad de reentrenar la red.</p>
+
+  <div class="card accent" style="margin-top:4mm;">
+    <h4>Resumen del flujo de un paso de aprendizaje</h4>
+    <p>Observar estado → elegir acción (ε-greedy con máscara) → ejecutar y observar (r, s′) → acumular retorno n-step → guardar en el buffer priorizado → muestrear lote según prioridad → calcular objetivo Double DQN → minimizar Huber ponderado por IS → actualizar prioridades con el nuevo |δ|.</p>
+  </div>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 6 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 7 · REWARD SHAPING ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">06 · Diseño de la recompensa</span><span class="right">Shaping por escenario</span></div>
+
+  <h2>La recompensa codifica qué significa "jugar bien" en cada sala</h2>
+  <p class="lead" style="margin-bottom:4mm;">El reward nativo de ViZDoom premia la velocidad de avance, lo que el agente aprende a explotar (farmear) sin completar el nivel. Se descarta y se construye una recompensa propia, distinta según la geometría del escenario.</p>
+
+  <div class="figrow" style="margin-bottom:4mm;">
+    <figure>
+      <img src="img/pasillo.jpg" alt="Escenario deadly_corridor">
+      <figcaption><span class="mono">deadly_corridor</span>: enemigos flanqueando un pasillo. Objetivo: avanzar hasta el chaleco del fondo sin morir.</figcaption>
+    </figure>
+    <figure>
+      <img src="img/sala.jpg" alt="Escenario defend_the_center">
+      <figcaption><span class="mono">defend_the_center</span>: arena con el jugador en el centro. Objetivo: sobrevivir girando y disparando a lo que aparece.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Jerarquía de la recompensa (de mayor a menor magnitud)</h3>
+  <table>
+    <tr><th style="width:42mm;">Componente</th><th style="width:20mm;">Valor</th><th>Razón de diseño</th></tr>
+    <tr class="hl"><td class="k">Completar nivel (pasillo)</td><td class="num">+300</td><td>Premio terminal que domina cualquier farmeo: llegar vivo al chaleco antes del timeout.</td></tr>
+    <tr><td class="k">Matar enemigo</td><td class="num">+150</td><td>Objetivo principal. Señal fuerte y dispersa, una por baja confirmada.</td></tr>
+    <tr><td class="k">Morir</td><td class="num">−100</td><td>Castigo explícito; sin él, "lanzarse y morir" salía rentable.</td></tr>
+    <tr><td class="k">Sobrevivir la ronda (sala)</td><td class="num">+50</td><td>Equivalente de la meta en la sala: aguantar hasta el timeout.</td></tr>
+    <tr><td class="k">Disparar a la nada</td><td class="num">−5</td><td>Penaliza malgastar munición; rompe el "rociar paredes".</td></tr>
+    <tr><td class="k">Disparar con blanco</td><td class="num">+2</td><td>Señal densa que guía hacia el comportamiento de combate.</td></tr>
+    <tr><td class="k">Esquivar (strafe) con enemigo</td><td class="num">+0.8</td><td>Fomenta evasión lateral cuando hay amenaza.</td></tr>
+    <tr><td class="k">Daño recibido</td><td class="num">−0.8·Δ</td><td>Proporcional a la vida perdida: enseña a cubrirse.</td></tr>
+    <tr><td class="k">Progreso (pasillo)</td><td class="num">+0.2·Δx</td><td>Solo por terreno <strong>nuevo</strong> ganado hacia la meta (delta de la X máxima). No es velocidad, así que ir y venir no farmea.</td></tr>
+    <tr><td class="k">Encarar / barrer (sala)</td><td class="num">+0.2 / +0.05</td><td>Premia centrar al enemigo y girar para escanear cuando no se ve ninguno.</td></tr>
+    <tr><td class="k">Costo por paso (pasillo)</td><td class="num">−0.05</td><td>Desincentiva merodear; en la sala se sustituye por un bono de supervivencia.</td></tr>
+  </table>
+
+  <div class="quote">
+    <p>La idea central del progreso "no farmeable": recompensar solo el avance monótono hacia la meta (cada unidad de terreno nuevo, una sola vez) en lugar de la velocidad. Así el óptimo de la recompensa coincide con completar el nivel, no con moverse mucho.</p>
+  </div>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom</span><span>Página 7 de 8</span></div>
+</section>
+
+<!-- ==================== PÁGINA 8 · RESULTADOS Y CONCLUSIONES ==================== -->
+<section class="page">
+  <div class="pagehead"><span class="left">07 · Resultados y conclusiones</span><span class="right">Curva de aprendizaje · cierre</span></div>
+
+  <h2>El agente aprende: la recompensa media crece de forma sostenida</h2>
+
+  <figure>
+    <img src="img/curva_rl.png" alt="Curva de aprendizaje del agente en la sala">
+    <figcaption>Curva de aprendizaje en <span class="mono">defend_the_center</span>. La media móvil (20 episodios, en rojo) sube de ~300 a ~1.400 de recompensa acumulada: evidencia de que la política mejora con la experiencia, no de ruido. La corrida extendida en Kaggle continúa este entrenamiento hasta 1.000.000 de pasos.</figcaption>
+  </figure>
+
+  <div class="grid3" style="margin:5mm 0;">
+    <div class="stat"><div class="num">~4.7×</div><div class="lbl">Crecimiento de la recompensa<br>media (300 → 1.400)</div></div>
+    <div class="stat"><div class="num">39 → 13 → 1</div><div class="lbl">Estado → tronco → cabezas<br>V y A de la red Dueling</div></div>
+    <div class="stat"><div class="num">1M</div><div class="lbl">Pasos de la corrida<br>final en Kaggle (GPU)</div></div>
+  </div>
+
+  <h3>Cuatro conclusiones</h3>
+  <div class="numbered">
+    <div class="step"><div class="n"></div><div><p><strong>Separar percepción de control fue la decisión acertada.</strong> Aprender sobre 39 features semánticas en vez de píxeles crudos hizo el problema tratable bajo cuota de GPU, y dejó una política interpretable.</p></div></div>
+    <div class="step"><div class="n"></div><div><p><strong>El auto-etiquetado in-domain resolvió las alucinaciones.</strong> Entrenar el detector con frames del propio motor (mAP 0.908) eliminó la brecha de dominio; leer la matriz de confusión guió la decisión de confiar solo en cuatro clases.</p></div></div>
+    <div class="step"><div class="n"></div><div><p><strong>El diseño de la recompensa importa tanto como el algoritmo.</strong> Descartar el reward nativo farmeable y construir un progreso no farmeable más eventos jerárquicos fue lo que alineó el incentivo del agente con completar el nivel.</p></div></div>
+    <div class="step"><div class="n"></div><div><p><strong>Las extensiones del DQN se justifican una a una.</strong> Double corrige sobreestimación, Dueling acelera el aprendizaje de valor, PER enfoca las muestras difíciles y n-step mejora la asignación de crédito. Cada una responde a un problema concreto del DQN base.</p></div></div>
+  </div>
+
+  <div class="rule" style="margin-top:4mm;"></div>
+  <h3>Trabajo futuro y entrega</h3>
+  <p style="font-size:9.3pt;">Líneas de mejora: ampliar el dataset a más clases de enemigos, comparar contra un baseline de DQN sobre píxeles para cuantificar la ganancia de la percepción explícita, y extender el presupuesto de pasos. La solución completa es un notebook autocontenido (<span class="mono">doom_entrega.ipynb</span>) que muestra el código de cada módulo inline, carga el detector ya entrenado desde el repositorio y entrena la política en GPU.</p>
+
+  <div class="pagefoot"><span>Sustentación · Proyecto Final · Agente Doom · Los Controladores</span><span>Página 8 de 8</span></div>
+</section>
+
+</body>
+</html>
