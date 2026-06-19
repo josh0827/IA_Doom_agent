@@ -144,11 +144,12 @@ def run_dqn():
                 env.env.send(f"summon {actor}")
 
     def equipar():
-        """god + escopeta equipada (slot 3, el arma con que entreno la politica)
-        + municion. 'give all' NO autoselecciona arma: hay que forzar el slot."""
+        """god + todas las armas + municion. 'give all' NO autoselecciona arma,
+        asi que la escopeta (slot 3) se fuerza luego en los primeros pasos del
+        bucle: ViZDoom procesa los comandos de consola de a uno por tic, por eso
+        no basta encolarlos todos juntos aqui."""
         env.env.send("god")
         env.env.send("give all")
-        env.env.send("slot 3")     # escopeta: arma de la politica de sala
         env.env.send("give ammo")
 
     try:
@@ -158,6 +159,10 @@ def run_dqn():
             poblar_arena(4)
         for step in range(max_steps):
             if SUMMON:
+                # Forzar la escopeta en los primeros pasos (un 'slot 3' por tic):
+                # garantiza que quede equipada pese al drenado de comandos.
+                if step < 6:
+                    env.env.send("slot 3")
                 # Municion infinita: rellena seguido para que nunca se quede sin balas.
                 if step % 15 == 0:
                     env.env.send("give ammo")
