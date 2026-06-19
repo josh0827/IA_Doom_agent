@@ -29,6 +29,7 @@ diagnostico/
 # WADs propios (demasiado grandes para git; descargar gratis desde freedoom.github.io)
 src/env/scenarios/*.wad
 
+_vizdoom.ini
 .idea/
 .vscode/
 *.swp

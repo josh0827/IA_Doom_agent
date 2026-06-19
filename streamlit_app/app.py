@@ -13,9 +13,25 @@ try:
     WEIGHTS = detector_weights()
 except FileNotFoundError:
     WEIGHTS = ROOT / "runs" / "doom-v1" / "weights" / "best.pt"  # fallback para mostrar error claro
-SCENARIO  = ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg"
-CKPT_RL   = ROOT / "runs" / "rl" / "dqn.pt"
-CURVE_IMG = ROOT / "runs" / "rl" / "learning_curve.png"
+
+# Escenarios disponibles: cada uno con su politica entrenada y su curva.
+#  - Pasillo (deadly_corridor): avanzar hasta el chaleco; politica dqn.pt.
+#  - Sala  (defend_the_center): torreta que gira y dispara; politica dqn_room.pt
+#    (modo torreta = se prohiben las acciones de avanzar en inferencia).
+ESCENARIOS = {
+    "Pasillo (deadly_corridor)": {
+        "cfg":   ROOT / "src" / "env" / "scenarios" / "deadly_corridor.cfg",
+        "ckpt":  ROOT / "runs" / "rl" / "dqn.pt",
+        "curva": ROOT / "runs" / "rl" / "learning_curve.png",
+        "torreta": False,
+    },
+    "Sala abierta (defend_the_center)": {
+        "cfg":   ROOT / "src" / "env" / "scenarios" / "defend_the_center.cfg",
+        "ckpt":  ROOT / "runs" / "rl" / "dqn_room.pt",
+        "curva": ROOT / "runs" / "rl" / "learning_curve_room.png",
+        "torreta": True,
+    },
+}
 
 st.set_page_config(page_title="Agente Doom — YOLO + DQN", layout="wide")
 st.title("Agente Doom con YOLO + Reinforcement Learning")
@@ -24,6 +40,11 @@ st.caption("Proyecto final · Teoría de Aprendizaje de Máquinas · UNAL 2026-1
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("Configuracion")
+    escenario_nombre = st.radio(
+        "Escenario",
+        list(ESCENARIOS.keys()),
+        help="Pasillo: avanzar a la meta. Sala: sobrevivir girando (torreta).",
+    )
     modo = st.radio(
         "Politica del agente",
         ["DQN (aprendido)", "Reglas (baseline)"],
@@ -34,14 +55,25 @@ with st.sidebar:
     st.divider()
     st.subheader("Acerca del proyecto")
     st.markdown(
-        "**Percepcion:** YOLOv8n entrenado sobre Doom-Enemy-Detection v4 "
-        "(668 imágenes, 10 clases de enemigos).  \n"
-        "**Politica:** Double DQN con Dueling architecture "
-        "(12→256→256 + cabezas V/A) entrenado 600 episodios.  \n"
-        "**Acciones:** 10 (strafe, disparo+movimiento simultaneo)."
+        "**Percepcion:** YOLOv8s entrenado sobre un dataset in-domain "
+        "auto-etiquetado desde ViZDoom (2213 imágenes; 4 clases fiables). "
+        "mAP@0.5 = 0.908.  \n"
+        "**Politica:** Double DQN con Dueling + PER + n-step "
+        "(estado 39 dims = 13 features × 3 frames, cabezas V/A).  \n"
+        "**Acciones:** 13 (strafe, giro+disparo, kiting). En la sala se "
+        "enmascaran las de avanzar (torreta)."
     )
+
+ESC = ESCENARIOS[escenario_nombre]
+SCENARIO  = ESC["cfg"]
+CKPT_RL   = ESC["ckpt"]
+CURVE_IMG = ESC["curva"]
+TORRETA   = ESC["torreta"]
+
+with st.sidebar:
     if CURVE_IMG.exists():
-        st.image(str(CURVE_IMG), caption="Curva de aprendizaje DQN", use_column_width=True)
+        st.image(str(CURVE_IMG), caption=f"Curva de aprendizaje — {escenario_nombre}",
+                 use_column_width=True)
 
 # ── Layout principal ───────────────────────────────────────────────────────────
 col_video, col_stats = st.columns([3, 1])
@@ -87,13 +119,16 @@ def run_dqn():
     env   = FrameStack(RLEnv(WEIGHTS, SCENARIO, frame_skip=2, conf=conf_yolo, window_visible=False), n_frames=3)
     agent = DQNAgent(env.state_dim, env.n_actions)
     agent.load(CKPT_RL)
+    # Modo torreta (sala): se prohibe avanzar enmascarando esas acciones.
+    forbidden = ({int(Action.MOVE_FORWARD), int(Action.FORWARD_ATTACK)}
+                 if TORRETA else None)
     fps = FPSCounter()
     total_reward = 0.0
 
     try:
         state = env.reset()
         for step in range(max_steps):
-            action = agent.act(state, greedy=True)
+            action = agent.act(state, greedy=True, forbidden=forbidden)
             state, reward, done, info = env.step(action)
             total_reward += reward
 
