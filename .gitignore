@@ -18,6 +18,9 @@ runs/
 # detector v4 (in-domain): versionado para clonar en Kaggle sin subir dataset.
 # Se fuerza con: git add -f runs/doom-v4/weights/best.pt
 !runs/doom-v4/weights/best.pt
+# politica de sala (defend_the_center) entrenada 1M pasos en Kaggle (mejor eval 1296).
+!runs/rl/dqn_room.pt
+!runs/rl/learning_curve_room.png
 
 .ipynb_checkpoints/
 .streamlit/
